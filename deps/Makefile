@@ -90,8 +90,8 @@ geohash-int: .make-prerequisites
 
 .PHONY: geohash-int
 
-nvml: .make-prerequisites
+pmdk: .make-prerequisites
 	@printf '%b %b\n' $(MAKECOLOR)MAKE$(ENDCOLOR) $(BINCOLOR)$@$(ENDCOLOR)
-	cd nvml && $(MAKE)
+	cd pmdk && $(MAKE)
 
-.PHONY: nvml
+.PHONY: pmdk
