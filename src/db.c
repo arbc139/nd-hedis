@@ -163,7 +163,7 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
  *
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
-    redisLog(REDIS_VERVOSE, "REDIS LOG DBADD");
+    serverLog(LL_VERBOSE, "REDIS LOG DBADD");
     sds copy = sdsdup(key->ptr);
     int retval = dictAdd(db->dict, copy, val);
 
