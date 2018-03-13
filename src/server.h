@@ -542,6 +542,9 @@ struct evictionPoolEntry {
  * database. The database number is the 'id' field in the structure. */
 typedef struct redisDb {
     dict *dict;                 /* The keyspace for this DB */
+#ifdef TODIS
+    dict *pm_dict;              /* The persistent keyspace for this DB */
+#endif
     dict *expires;              /* Timeout of keys with a timeout set */
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP) */
     dict *ready_keys;           /* Blocked keys that received a PUSH */

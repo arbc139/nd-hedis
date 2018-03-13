@@ -182,6 +182,7 @@ void dbAddPM(redisDb *db, robj *key, robj *val) {
 
     sds copy = sdsdupPM(key->ptr, (void **) &kv_pm_reference);
     int retval = dictAddPM(db->dict, copy, val);
+    serverLog(LL_VERBOSE, "TODIS, dbAddPM, copied key: %s", copy);
 
     kv_PM = pmemAddToPmemList((void *)copy, (void *)(val->ptr));
     *kv_pm_reference = kv_PM;
