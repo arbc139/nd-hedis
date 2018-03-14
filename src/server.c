@@ -2307,7 +2307,6 @@ void call(client *c, int flags) {
     /* Call the command. */
     dirty = server.dirty;
     start = ustime();
-    serverLog(LL_VERBOSE, "TODIS, c->cmd->proc(c) is called?");
     c->cmd->proc(c);
     duration = ustime()-start;
     dirty = server.dirty-dirty;

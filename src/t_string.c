@@ -70,18 +70,6 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     robj* newVal = 0;
 #endif
 
-#ifdef TODIS
-    sds pm_header = sdsnew("TODIS_PM:");
-    serverLog(LL_VERBOSE, "TODIS, pm_header: %s", pm_header);
-    serverLog(LL_VERBOSE, "TODIS, key: %s", key->ptr);
-    sds new_key = sdscatsds(sdsdup(pm_header), key->ptr);
-    serverLog(LL_VERBOSE, "TODIS, new_key: %s", new_key);
-    sdsfree(key->ptr);
-    sdsfree(pm_header);
-    key->ptr = new_key;
-    serverLog(LL_VERBOSE, "TODIS, pm header to key: %s", key->ptr);
-#endif
-
     if (expire) {
         if (getLongLongFromObjectOrReply(c, expire, &milliseconds, NULL) != C_OK)
             return;
