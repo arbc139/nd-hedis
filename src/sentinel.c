@@ -383,7 +383,7 @@ unsigned int dictSdsHash(const void *key);
 int dictSdsKeyCompare(void *privdata, const void *key1, const void *key2);
 void releaseSentinelRedisInstance(sentinelRedisInstance *ri);
 
-void dictInstancesValDestructor (void *privdata, void *obj) {
+void dictInstancesValDestructor (void *privdata, dictEntry *entry, void *obj) {
     UNUSED(privdata);
     releaseSentinelRedisInstance(obj);
 }

@@ -424,13 +424,13 @@ void exitFromChild(int retcode) {
  * keys and redis objects as values (objects can hold SDS strings,
  * lists, sets). */
 
-void dictVanillaFree(void *privdata, void *val)
+void dictVanillaFree(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
     zfree(val);
 }
 
-void dictListDestructor(void *privdata, void *val)
+void dictListDestructor(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
     listRelease((list*)val);
@@ -458,7 +458,7 @@ int dictSdsKeyCaseCompare(void *privdata, const void *key1,
     return strcasecmp(key1, key2) == 0;
 }
 
-void dictObjectDestructor(void *privdata, void *val)
+void dictObjectDestructor(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
 
@@ -467,7 +467,7 @@ void dictObjectDestructor(void *privdata, void *val)
 }
 
 #ifdef USE_PMDK
-void dictObjectDestructorPM(void *privdata, void *val)
+void dictObjectDestructorPM(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
 
@@ -482,7 +482,7 @@ void dictObjectDestructorPM(void *privdata, void *val)
 }
 #endif
 
-void dictSdsDestructor(void *privdata, void *val)
+void dictSdsDestructor(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
 
@@ -490,7 +490,7 @@ void dictSdsDestructor(void *privdata, void *val)
 }
 
 #ifdef USE_PMDK
-void dictSdsDestructorPM(void *privdata, void *val)
+void dictSdsDestructorPM(void *privdata, dictEntry *entry, void *val)
 {
     PMEMoid *kv_PM_oid;
 

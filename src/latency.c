@@ -45,7 +45,7 @@ unsigned int dictStringHash(const void *key) {
     return dictGenHashFunction(key, strlen(key));
 }
 
-void dictVanillaFree(void *privdata, void *val);
+void dictVanillaFree(void *privdata, dictEntry *entry, void *val);
 
 dictType latencyTimeSeriesDictType = {
     dictStringHash,             /* hash function */
