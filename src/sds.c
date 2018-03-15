@@ -163,11 +163,17 @@ sds sdsnewlenPM(const void *init, size_t initlen) {
     unsigned char *fp; /* flags pointer. */
 
     hdrlen += sizeof(PMEMoid);
-    oid = pmemobj_tx_zalloc((hdrlen+initlen+1),PM_TYPE_SDS);
+    size_t totallen = hdrlen + initlen + 1;
+    oid = pmemobj_tx_zalloc(totallen, PM_TYPE_SDS);
     sh = pmemobj_direct(oid);
 
+#ifdef TODIS
+    serverLog(LL_VERBOSE, "TODIS, sdsnewlenPM sds size: %zu", totallen);
+    server.used_pmem_memory += totallen;
+#endif
+
     if (!init)
-        memset(sh, 0, hdrlen+initlen+1);
+        memset(sh, 0, totallen);
     if (sh == NULL) return NULL;
     s = (char*)sh+hdrlen;
     fp = ((unsigned char*)s)-1;
@@ -260,6 +266,10 @@ void sdsfreePM(sds s) {
     if (server.persistent) {
         oid.off = (uint64_t)((char*)s-sdsHdrSize(s[-1])) - sizeof(PMEMoid) - (uint64_t)server.pm_pool;
         oid.pool_uuid_lo = server.pool_uuid_lo;
+#ifdef TODIS
+        serverLog(LL_VERBOSE, "TODIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
+        server.used_pmem_memory -= sdsAllocSizePM(s);
+#endif
         pmemobj_tx_free(oid);
     } else {
         s_free((char*)s-sdsHdrSize(s[-1]));
@@ -388,6 +398,12 @@ sds sdsRemoveFreeSpace(sds s) {
 size_t sdsAllocSize(sds s) {
     size_t alloc = sdsalloc(s);
     return sdsHdrSize(s[-1])+alloc+1;
+}
+
+size_t sdsAllocSizePM(sds s) {
+    size_t alloc = sdsalloc(s);
+    size_t pmemoid = sizeof(PMEMoid);
+    return sdsHdrSize(s[-1]) + alloc + pmemoid + 1;
 }
 
 /* Return the pointer of the actual SDS allocation (normally SDS strings

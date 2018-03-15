@@ -267,6 +267,9 @@ sds sdsMakeRoomFor(sds s, size_t addlen);
 void sdsIncrLen(sds s, int incr);
 sds sdsRemoveFreeSpace(sds s);
 size_t sdsAllocSize(sds s);
+#ifdef TODIS
+size_t sdsAllocSizePM(sds s);
+#endif
 void *sdsAllocPtr(sds s);
 
 /* Export the allocator used by SDS to the program using SDS.

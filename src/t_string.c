@@ -161,7 +161,6 @@ void setCommand(client *c) {
         }
     }
 
-    serverLog(LL_VERBOSE, "TODIS, setCommand key is: %s", c->argv[2]->ptr);
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }

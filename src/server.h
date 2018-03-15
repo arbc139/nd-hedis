@@ -862,6 +862,7 @@ struct redisServer {
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
 #endif
 #ifdef TODIS
+    size_t used_pmem_memory;     /* Used memory capacity in pmem */
     size_t max_pmem_memory;          /* Maximum memory capacity for pmem */
 #endif
     /* AOF persistence */

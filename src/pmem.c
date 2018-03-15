@@ -91,6 +91,13 @@ pmemAddToPmemList(void *key, void *val)
     val_oid.pool_uuid_lo = server.pool_uuid_lo;
     val_oid.off = (uint64_t)val - (uint64_t)server.pm_pool->addr;
 
+#ifdef TODIS
+        serverLog(
+                LL_VERBOSE,
+                "TODIS, pmemAddToPmemList key_val_pair_PM size: %zu",
+                sizeof(struct key_val_pair_PM));
+    server.used_pmem_memory += sizeof(struct key_val_pair_PM);
+#endif
     kv_PM = pmemobj_tx_zalloc(sizeof(struct key_val_pair_PM), pm_type_key_val_pair_PM);
     kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct(kv_PM);
     kv_PM_p->key_oid = key_oid;
@@ -130,6 +137,13 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
     		next->pmem_list_prev.oid = OID_NULL;
     	}
+#ifdef TODIS
+        serverLog(
+                LL_VERBOSE,
+                "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
+                sizeof(struct key_val_pair_PM));
+        server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
+#endif
     	TX_FREE(root->pe_first);
     	TX_ADD_DIRECT(root);
     	root->pe_first = typed_kv_PM_next;
@@ -149,6 +163,13 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
     		next->pmem_list_prev = typed_kv_PM_prev;
     	}
+ #ifdef TODIS
+        serverLog(
+                LL_VERBOSE,
+                "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
+                sizeof(struct key_val_pair_PM));
+        server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
+#endif
     	TX_FREE(typed_kv_PM);
     	TX_ADD_FIELD_DIRECT(root,num_dict_entries);
         root->num_dict_entries--;
@@ -159,9 +180,7 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
 
 #ifdef TODIS
 size_t pmem_used_memory(void) {
-    serverLog(LL_VERBOSE, "TODIS, need to implement pmem.c/pmem_used_memory!");
-    size_t rootsize = pmemobj_root_size(server.pm_pool);
-    serverLog(LL_VERBOSE, "TODIS, test rootsize: %d", rootsize);
-    return 0;
+    serverLog(LL_VERBOSE, "TODIS, used_pmem_memory: %zu", server.used_pmem_memory);
+    return server.used_pmem_memory;
 }
 #endif

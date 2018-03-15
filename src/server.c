@@ -1529,6 +1529,7 @@ void initServerConfig(void) {
     server.pm_reconstruct_required = false;
 #endif
 #ifdef TODIS
+    server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
 #endif
     server.supervised = 0;
@@ -3691,6 +3692,8 @@ int freeMemoryIfNeeded(void) {
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void) {
     serverLog(LL_VERBOSE, "TODIS, need to implements server.c/freePmemMemoryIfNeeded!");
+    pmem_used_memory();
+    return 0;
 }
 #endif
 
