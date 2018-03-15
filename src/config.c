@@ -397,6 +397,15 @@ void loadServerConfigFromString(char *config) {
             }
             server.pm_file_size = size;
 #endif
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0],"max_pmem_memory") && (argc == 3)) {
+            long long max_pmem_memory = memtoll(argv[1],NULL);
+            serverLog(LL_VERBOSE, "TODIS, max_pmem_memory: %ld", max_pmem_memory);
+            if (max_pmem_memory < CONFIG_MIN_MAX_PMEM_MEMORY_SIZE) {
+                err = "Invalid max pmem memory size"; goto loaderr;
+            }
+            server.max_pmem_memory = max_pmem_memory;
+#endif
         } else if (!strcasecmp(argv[0],"appendonly") && argc == 2) {
             int yes;
 

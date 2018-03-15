@@ -1528,6 +1528,9 @@ void initServerConfig(void) {
     server.pm_file_size = CONFIG_DEFAULT_PM_FILE_SIZE;
     server.pm_reconstruct_required = false;
 #endif
+#ifdef TODIS
+    server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
+#endif
     server.supervised = 0;
     server.supervised_mode = SUPERVISED_NONE;
     server.aof_state = AOF_OFF;

@@ -81,6 +81,11 @@ struct redis_pmem_root {
 
 #endif
 
+#ifdef TODIS
+#define LOCATION_DRAM 0
+#define LOCATION_PMEM 1
+#endif
+
 typedef long long mstime_t; /* millisecond time type. */
 
 #include "ae.h"      /* Event driven programming library */
@@ -177,6 +182,11 @@ typedef long long mstime_t; /* millisecond time type. */
 #ifdef USE_PMDK
 #define CONFIG_MIN_PM_FILE_SIZE PMEMOBJ_MIN_POOL
 #define CONFIG_DEFAULT_PM_FILE_SIZE (1024*1024*1024) /* 1GB */
+#endif
+
+#ifdef TODIS
+#define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024*1024*1024 /* 1GB */
+#define CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE CONFIG_MIN_MAX_PMEM_MEMORY_SIZE
 #endif
 
 #define ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 20 /* Loopkups per loop. */
@@ -501,6 +511,14 @@ typedef long long mstime_t; /* millisecond time type. */
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
 typedef struct redisObject {
     unsigned type:4;
+    #ifdef TODIS
+    /*
+     * TODIS - Data location : Memory or Persistent store
+     * 0 : DRAM, 1 : PMEM
+     * TODO Need to change as an atomic variable
+     * */
+    unsigned location:1;
+    #endif
     unsigned encoding:4;
     unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */
     int refcount;
@@ -845,6 +863,9 @@ struct redisServer {
     PMEMobjpool *pm_pool;           /* PMEM pool handle */
     TOID(struct redis_pmem_root) pm_rootoid; /*PMEM root object OID*/
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
+#endif
+#ifdef TODIS
+    size_t max_pmem_memory;          /* Maximum memory capacity for pmem */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
