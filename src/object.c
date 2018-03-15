@@ -257,6 +257,7 @@ robj *dupStringObject(robj *o) {
  * The resulting object always has refcount set to 1. */
 robj *dupStringObjectPM(robj *o) {
     robj *d;
+    char int_str_buf[1024];
 
     serverAssert(o->type == OBJ_STRING);
 

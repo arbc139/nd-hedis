@@ -52,6 +52,15 @@ pmemReconstruct(void)
 		kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t)pmem_base_addr);
 		key = (void *)(kv_PM->key_oid.off + (uint64_t)pmem_base_addr);
 		val = (void *)(kv_PM->val_oid.off + (uint64_t)pmem_base_addr);
+#ifdef TODIS
+        server.used_pmem_memory += sdsAllocSizePM(key);
+        server.used_pmem_memory += sdsAllocSizePM(val);
+        server.used_pmem_memory += sizeof(struct key_val_pair_PM);
+        serverLog(
+                LL_VERBOSE,
+                "TODIS, pmemReconstruct reconstructed used_pmem_memory: %zu",
+                server.used_pmem_memory);
+#endif
 
         (void)dictAddReconstructedPM(d, key, val);
     }
