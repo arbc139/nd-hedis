@@ -2492,6 +2492,12 @@ int processCommand(client *c) {
         }
     }
 
+#ifdef TODIS
+    if (server.max_pmem_memory) {
+        freePmemMemoryIfNeeded();
+    }
+#endif
+
     /* Don't accept write commands if there are problems persisting on disk
      * and if this is a master instance. */
     if (((server.stop_writes_on_bgsave_err &&
@@ -3682,6 +3688,12 @@ int freeMemoryIfNeeded(void) {
     return C_OK;
 }
 
+#ifdef TODIS
+int freePmemMemoryIfNeeded(void) {
+    serverLog(LL_VERBOSE, "TODIS, need to implements server.c/freePmemMemoryIfNeeded!");
+}
+#endif
+
 /* =================================== Main! ================================ */
 
 #ifdef __linux__
@@ -4004,7 +4016,6 @@ int redisIsSupervised(int mode) {
 void initPersistentMemory(void) {
     PMEMoid oid;
     struct redis_pmem_root *root;
-    
 
     long long start = ustime();
     char pmfile_hmem[64];
@@ -4019,7 +4030,7 @@ void initPersistentMemory(void) {
         /* Open the existing PMEM pool file. */
         server.pm_pool = pmemobj_open(server.pm_file_path, PM_LAYOUT_NAME);
         server.pm_rootoid = POBJ_ROOT(server.pm_pool, struct redis_pmem_root);
-	server.pm_reconstruct_required = true;
+	    server.pm_reconstruct_required = true;
 
         if (server.pm_pool == NULL) {
             serverLog(LL_WARNING,"Cannot init persistent memory poolset file "

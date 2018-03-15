@@ -156,3 +156,12 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     }
 }
 #endif
+
+#ifdef TODIS
+size_t pmem_used_memory(void) {
+    serverLog(LL_VERBOSE, "TODIS, need to implement pmem.c/pmem_used_memory!");
+    size_t rootsize = pmemobj_root_size(server.pm_pool);
+    serverLog(LL_VERBOSE, "TODIS, test rootsize: %d", rootsize);
+    return 0;
+}
+#endif
