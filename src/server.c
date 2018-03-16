@@ -1531,6 +1531,7 @@ void initServerConfig(void) {
 #ifdef TODIS
     server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
+    server.max_pmem_memory_policy = CONFIG_DEFAULT_MAXMEMORY_POLICY;
 #endif
     server.supervised = 0;
     server.supervised_mode = SUPERVISED_NONE;
@@ -3692,7 +3693,29 @@ int freeMemoryIfNeeded(void) {
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void) {
     serverLog(LL_VERBOSE, "TODIS, need to implements server.c/freePmemMemoryIfNeeded!");
-    pmem_used_memory();
+    size_t pmem_used, pmem_tofree, pmem_freed;
+
+    pmem_used = pmem_used_memory();
+
+    /* Check if we are over the persistent memory limit. */
+    if (pmem_used <= server.max_pmem_memory) return C_OK;
+    pmem_tofree = pmem_used - server.max_pmem_memory;
+    pmem_freed = 0;
+
+    while (pmem_freed < pmem_tofree) {
+        int j, k, keys_freed = 0;
+
+        for (j = 0; j < server.dbnum; j++) {
+            long bestval = 0; /* just to prevent warning */
+            sds bestkey = NULL;
+            dictEntry *de;
+            redisDb *db = server.db + j;
+            dict *dict;
+
+            // TODO(totoro): Implement maxmemory policy for persistent memory.
+        }
+    }
+
     return 0;
 }
 #endif

@@ -53,6 +53,18 @@ configEnum maxmemory_policy_enum[] = {
     {NULL, 0}
 };
 
+#ifdef TODIS
+configEnum max_pmem_memory_policy_enum[] = {
+    {"volatile-lru", MAXMEMORY_VOLATILE_LRU},
+    {"volatile-random",MAXMEMORY_VOLATILE_RANDOM},
+    {"volatile-ttl",MAXMEMORY_VOLATILE_TTL},
+    {"allkeys-lru",MAXMEMORY_ALLKEYS_LRU},
+    {"allkeys-random",MAXMEMORY_ALLKEYS_RANDOM},
+    {"noeviction",MAXMEMORY_NO_EVICTION},
+    {NULL, 0}
+};
+#endif
+
 configEnum syslog_facility_enum[] = {
     {"user",    LOG_USER},
     {"local0",  LOG_LOCAL0},
@@ -302,6 +314,15 @@ void loadServerConfigFromString(char *config) {
                 err = "Invalid maxmemory policy";
                 goto loaderr;
             }
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0], "max-pmem-memory-policy") && argc == 2) {
+            server.max_pmem_memory_policy =
+                configEnumGetValue(max_pmem_memory_policy_enum, argv[1]);
+            if (server.max_pmem_memory_policy == INT_MIN) {
+                err = "Invalid maxmemory policy";
+                goto loaderr;
+            }
+#endif
         } else if (!strcasecmp(argv[0],"maxmemory-samples") && argc == 2) {
             server.maxmemory_samples = atoi(argv[1]);
             if (server.maxmemory_samples <= 0) {
@@ -1015,6 +1036,12 @@ void configSetCommand(client *c) {
       "loglevel",server.verbosity,loglevel_enum) {
     } config_set_enum_field(
       "maxmemory-policy",server.maxmemory_policy,maxmemory_policy_enum) {
+#ifdef TODIS
+    } config_set_enum_field(
+      "max-pmem-memory-policy",
+      server.max_pmem_memory_policy,
+      max_pmem_memory_policy_enum) {
+#endif
     } config_set_enum_field(
       "appendfsync",server.aof_fsync,aof_fsync_enum) {
 
@@ -1168,6 +1195,10 @@ void configGetCommand(client *c) {
     /* Enum values */
     config_get_enum_field("maxmemory-policy",
             server.maxmemory_policy,maxmemory_policy_enum);
+#ifdef TODIS
+    config_get_enum_field("max-pmem-memory-policy",
+            server.max_pmem_memory_policy, max_pmem_memory_policy_enum);
+#endif
     config_get_enum_field("loglevel",
             server.verbosity,loglevel_enum);
     config_get_enum_field("supervised",
@@ -1842,6 +1873,9 @@ int rewriteConfig(char *path) {
     rewriteConfigNumericalOption(state,"maxclients",server.maxclients,CONFIG_DEFAULT_MAX_CLIENTS);
     rewriteConfigBytesOption(state,"maxmemory",server.maxmemory,CONFIG_DEFAULT_MAXMEMORY);
     rewriteConfigEnumOption(state,"maxmemory-policy",server.maxmemory_policy,maxmemory_policy_enum,CONFIG_DEFAULT_MAXMEMORY_POLICY);
+#ifdef TODIS
+    rewriteConfigEnumOption(state, "max-pmem-memory-policy", server.max_pmem_memory_policy, max_pmem_memory_policy_enum, CONFIG_DEFAULT_MAXMEMORY_POLICY);
+#endif
     rewriteConfigNumericalOption(state,"maxmemory-samples",server.maxmemory_samples,CONFIG_DEFAULT_MAXMEMORY_SAMPLES);
     rewriteConfigYesNoOption(state,"appendonly",server.aof_state != AOF_OFF,0);
     rewriteConfigStringOption(state,"appendfilename",server.aof_filename,CONFIG_DEFAULT_AOF_FILENAME);

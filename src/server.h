@@ -862,8 +862,9 @@ struct redisServer {
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
 #endif
 #ifdef TODIS
-    size_t used_pmem_memory;     /* Used memory capacity in pmem */
-    size_t max_pmem_memory;          /* Maximum memory capacity for pmem */
+    size_t used_pmem_memory;        /* Used memory capacity in pmem */
+    size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
+    int max_pmem_memory_policy;     /* Policy for key eviction */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
