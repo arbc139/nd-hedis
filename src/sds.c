@@ -168,7 +168,7 @@ sds sdsnewlenPM(const void *init, size_t initlen) {
     sh = pmemobj_direct(oid);
 
 #ifdef TODIS
-    serverLog(LL_VERBOSE, "TODIS, sdsnewlenPM sds size: %zu", totallen);
+    serverLog(LL_TODIS, "TODIS, sdsnewlenPM sds size: %zu", totallen);
     server.used_pmem_memory += totallen;
 #endif
 
@@ -267,7 +267,7 @@ void sdsfreePM(sds s) {
         oid.off = (uint64_t)((char*)s-sdsHdrSize(s[-1])) - sizeof(PMEMoid) - (uint64_t)server.pm_pool;
         oid.pool_uuid_lo = server.pool_uuid_lo;
 #ifdef TODIS
-        serverLog(LL_VERBOSE, "TODIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
+        serverLog(LL_TODIS, "TODIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
         server.used_pmem_memory -= sdsAllocSizePM(s);
 #endif
         pmemobj_tx_free(oid);

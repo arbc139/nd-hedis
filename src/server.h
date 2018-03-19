@@ -1380,6 +1380,9 @@ unsigned long zslGetRank(zskiplist *zsl, double score, robj *o);
 
 /* Core functions */
 int freeMemoryIfNeeded(void);
+#ifdef TODIS
+int freePmemMemoryIfNeeded(void);
+#endif
 int processCommand(client *c);
 void setupSignalHandlers(void);
 struct redisCommand *lookupCommand(sds name);

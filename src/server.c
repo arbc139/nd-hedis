@@ -2535,10 +2535,6 @@ int processCommand(client *c) {
     }
 #endif
 
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODO(totoro): show pmem status");
-#endif
-
     /* Don't accept write commands if there are problems persisting on disk
      * and if this is a master instance. */
     if (((server.stop_writes_on_bgsave_err &&
@@ -2641,6 +2637,11 @@ int processCommand(client *c) {
         if (listLength(server.ready_keys))
             handleClientsBlockedOnLists();
     }
+
+#ifdef TODIS
+    writeStatusLogs();
+#endif
+
     return C_OK;
 }
 
@@ -3564,6 +3565,81 @@ void evictionPoolPopulate(dict *sampledict, dict *keydict, struct evictionPoolEn
     if (samples != _samples) zfree(samples);
 }
 
+#ifdef TODIS
+/* This is an helper function for freeMemoryIfNeeded(), it is used in order
+ * to populate the evictionPool with a few entries every time we want to
+ * expire a key. Keys with idle time smaller than one of the current
+ * keys are added. Keys are always added if there are free entries.
+ *
+ * We insert keys on place in ascending order, so keys with the smaller
+ * idle time are on the left, and keys with the higher idle time on the
+ * right. */
+void evictionPoolPopulatePM(dict *sampledict, dict *keydict, struct evictionPoolEntry *pool) {
+    int j, k, count;
+    dictEntry *_samples[EVICTION_SAMPLES_ARRAY_SIZE];
+    dictEntry **samples;
+
+    /* Try to use a static buffer: this function is a big hit...
+     * Note: it was actually measured that this helps. */
+    if (server.maxmemory_samples <= EVICTION_SAMPLES_ARRAY_SIZE) {
+        samples = _samples;
+    } else {
+        samples = zmalloc(sizeof(samples[0])*server.maxmemory_samples);
+    }
+
+    count = dictGetSomeKeysPM(sampledict,samples,server.maxmemory_samples);
+    for (j = 0; j < count; j++) {
+        unsigned long long idle;
+        sds key;
+        robj *o;
+        dictEntry *de;
+
+        de = samples[j];
+        key = dictGetKey(de);
+        /* If the dictionary we are sampling from is not the main
+         * dictionary (but the expires one) we need to lookup the key
+         * again in the key dictionary to obtain the value object. */
+        if (sampledict != keydict) de = dictFind(keydict, key);
+        o = dictGetVal(de);
+        idle = estimateObjectIdleTime(o);
+
+        /* Insert the element inside the pool.
+         * First, find the first empty bucket or the first populated
+         * bucket that has an idle time smaller than our idle time. */
+        k = 0;
+        while (k < MAXMEMORY_EVICTION_POOL_SIZE &&
+               pool[k].key &&
+               pool[k].idle < idle) k++;
+        if (k == 0 && pool[MAXMEMORY_EVICTION_POOL_SIZE-1].key != NULL) {
+            /* Can't insert if the element is < the worst element we have
+             * and there are no empty buckets. */
+            continue;
+        } else if (k < MAXMEMORY_EVICTION_POOL_SIZE && pool[k].key == NULL) {
+            /* Inserting into empty position. No setup needed before insert. */
+        } else {
+            /* Inserting in the middle. Now k points to the first element
+             * greater than the element to insert.  */
+            if (pool[MAXMEMORY_EVICTION_POOL_SIZE-1].key == NULL) {
+                /* Free space on the right? Insert at k shifting
+                 * all the elements from k to end to the right. */
+                memmove(pool+k+1,pool+k,
+                    sizeof(pool[0])*(MAXMEMORY_EVICTION_POOL_SIZE-k-1));
+            } else {
+                /* No free space on right? Insert at k-1 */
+                k--;
+                /* Shift all elements on the left of k (included) to the
+                 * left, so we discard the element with smaller idle time. */
+                sdsfree(pool[0].key);
+                memmove(pool,pool+1,sizeof(pool[0])*k);
+            }
+        }
+        pool[k].key = sdsdup(key);
+        pool[k].idle = idle;
+    }
+    if (samples != _samples) zfree(samples);
+}
+#endif
+
 int freeMemoryIfNeeded(void) {
     size_t mem_used, mem_tofree, mem_freed;
     int slaves = listLength(server.slaves);
@@ -3778,7 +3854,7 @@ int freePmemMemoryIfNeeded(void) {
                struct evictionPoolEntry *pool = db -> eviction_pool;
 
                while (bestkey == NULL) {
-                   evictionPoolPopulate(dict, db->dict, db->eviction_pool);
+                   evictionPoolPopulatePM(dict, db->dict, db->eviction_pool);
                    /* Go backward from best to worst element to evict. */
                    for (k = MAXMEMORY_EVICTION_POOL_SIZE-1; k >= 0; k--) {
                        if (pool[k].key == NULL) continue;
@@ -3856,6 +3932,15 @@ int freePmemMemoryIfNeeded(void) {
     }
 
     return C_OK;
+}
+#endif
+
+#ifdef TODIS
+void writeStatusLogs(void) {
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, writeStatusLogs START");
+    serverLog(LL_TODIS, "TODIS, pmem memory used: %zu", pmem_used_memory());
+    serverLog(LL_TODIS, "TODIS, writeStatusLogs END");
 }
 #endif
 

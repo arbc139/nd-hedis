@@ -36,6 +36,10 @@
 int
 pmemReconstruct(void)
 {
+#ifdef TODIS
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, pmemReconstruct START");
+#endif
     TOID(struct redis_pmem_root) root;
     TOID(struct key_val_pair_PM) kv_PM_oid;
     struct key_val_pair_PM *kv_PM;
@@ -57,13 +61,16 @@ pmemReconstruct(void)
         server.used_pmem_memory += sdsAllocSizePM(val);
         server.used_pmem_memory += sizeof(struct key_val_pair_PM);
         serverLog(
-                LL_VERBOSE,
+                LL_TODIS,
                 "TODIS, pmemReconstruct reconstructed used_pmem_memory: %zu",
                 server.used_pmem_memory);
 #endif
 
         (void)dictAddReconstructedPM(d, key, val);
     }
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
+#endif
     return C_OK;
 }
 
@@ -87,6 +94,8 @@ void pmemKVpairSet(void *key, void *val)
 PMEMoid
 pmemAddToPmemList(void *key, void *val)
 {
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, pmemADDToPmemList START");
     PMEMoid key_oid;
     PMEMoid val_oid;
     PMEMoid kv_PM;
@@ -102,7 +111,7 @@ pmemAddToPmemList(void *key, void *val)
 
 #ifdef TODIS
         serverLog(
-                LL_VERBOSE,
+                LL_TODIS,
                 "TODIS, pmemAddToPmemList key_val_pair_PM size: %zu",
                 sizeof(struct key_val_pair_PM));
     server.used_pmem_memory += sizeof(struct key_val_pair_PM);
@@ -126,12 +135,19 @@ pmemAddToPmemList(void *key, void *val)
     root->pe_first = typed_kv_PM;
     root->num_dict_entries++;
 
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, pmemAddFromPmemList END");
+#endif
     return kv_PM;
 }
 
 void
 pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
 {
+#ifdef TODIS
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList START");
+#endif
     TOID(struct key_val_pair_PM) typed_kv_PM;
     struct redis_pmem_root *root;
 
@@ -148,7 +164,7 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     	}
 #ifdef TODIS
         serverLog(
-                LL_VERBOSE,
+                LL_TODIS,
                 "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
                 sizeof(struct key_val_pair_PM));
         server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
@@ -174,7 +190,7 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     	}
  #ifdef TODIS
         serverLog(
-                LL_VERBOSE,
+                LL_TODIS,
                 "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
                 sizeof(struct key_val_pair_PM));
         server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
@@ -184,12 +200,14 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
         root->num_dict_entries--;
         return;
     }
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
+#endif
 }
 #endif
 
 #ifdef TODIS
 size_t pmem_used_memory(void) {
-    serverLog(LL_VERBOSE, "TODIS, used_pmem_memory: %zu", server.used_pmem_memory);
     return server.used_pmem_memory;
 }
 #endif

@@ -182,6 +182,9 @@ dictEntry *dictGetRandomKey(dict *d);
 dictEntry *dictGetRandomKeyPM(dict *d);
 #endif
 unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count);
+#ifdef TODIS
+unsigned int dictGetSomeKeysPM(dict *d, dictEntry **des, unsigned int count);
+#endif
 void dictGetStats(char *buf, size_t bufsize, dict *d);
 unsigned int dictGenHashFunction(const void *key, int len);
 unsigned int dictGenCaseHashFunction(const unsigned char *buf, int len);
