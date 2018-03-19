@@ -296,6 +296,10 @@ struct redisCommand redisCommandTable[] = {
     {"pfdebug",pfdebugCommand,-3,"w",0,NULL,0,0,0,0,0},
     {"post",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
     {"host:",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
+#ifdef TODIS
+    {"pmemstatus",getPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
+    {"dramstatus",getDramStatusCommand,1,"r",0,NULL,0,0,0,0,0},
+#endif
     {"latency",latencyCommand,-2,"aslt",0,NULL,0,0,0,0,0}
 };
 
