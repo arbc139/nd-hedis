@@ -347,7 +347,7 @@ int dictAdd(dict *d, void *key, void *val)
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
 #ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, dictAdd key: %s, val: %s", key, val);
+    serverLog(LL_TODIS, "TODIS, dictAdd key: %s, val: %s", key, ((robj *)val)->ptr);
 #endif
     return DICT_OK;
 }

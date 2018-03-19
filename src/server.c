@@ -3824,17 +3824,18 @@ int freePmemMemoryIfNeeded(void) {
     pmem_tofree = pmem_used - server.max_pmem_memory;
     pmem_freed = 0;
 
-    serverLog(LL_VERBOSE, "TODIS, pmem eviction is fired.");
+    serverLog(LL_TODIS, "##############################");
+    serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
 
     while (pmem_freed < pmem_tofree) {
         int j, k, keys_freed = 0;
 
         for (j = 0; j < server.dbnum; j++) {
             long bestval = 0; /* just to prevent warning */
-            sds bestkey = NULL;
             dictEntry *de;
             redisDb *db = server.db + j;
             dict *dict;
+            dictEntry *bestde;
 
             if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU ||
                 server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
@@ -3847,8 +3848,7 @@ int freePmemMemoryIfNeeded(void) {
             /* volatile-random and allkeys-random policy */
             if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM ||
                 server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_RANDOM) {
-                de = dictGetRandomKeyPM(dict);
-                bestkey = dictGetKey(de);
+                bestde = dictGetRandomKeyPM(dict);
             }
 
             /* volatile-lru and allkeys-lru policy */
@@ -3856,7 +3856,7 @@ int freePmemMemoryIfNeeded(void) {
                     server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_LRU) {
                struct evictionPoolEntry *pool = db -> eviction_pool;
 
-               while (bestkey == NULL) {
+               while (bestde == NULL) {
                    evictionPoolPopulatePM(dict, db->dict, db->eviction_pool);
                    /* Go backward from best to worst element to evict. */
                    for (k = MAXMEMORY_EVICTION_POOL_SIZE-1; k >= 0; k--) {
@@ -3878,7 +3878,7 @@ int freePmemMemoryIfNeeded(void) {
                        /* If the key exists, is our pick. Otherwise it is
                         * a ghost and we need to try the next element. */
                        if (de) {
-                           bestkey = dictGetKey(de);
+                           bestde = de;
                            break;
                        } else {
                            /* Ghost... */
@@ -3891,28 +3891,48 @@ int freePmemMemoryIfNeeded(void) {
             /* volatile-ttl */
             else if (server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_TTL) {
                 for (k = 0; k < server.maxmemory_samples; k++) {
-                    sds thiskey;
                     long thisval;
 
                     de = dictGetRandomKeyPM(dict);
-                    thiskey = dictGetKey(de);
                     thisval = (long) dictGetVal(de);
 
                     /* Expire sooner (minor expire unix timestamp) is better
                      * candidate for deletion */
-                    if (bestkey == NULL || thisval < bestval) {
-                        bestkey = thiskey;
+                    if (bestde == NULL || thisval < bestval) {
+                        bestde = de;
                         bestval = thisval;
                     }
                 }
             }
 
             /* Finally remove the selected key. */
-            if (bestkey) {
+            if (bestde != NULL) {
                 long long delta;
+                serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", bestde);
+
+                sds bestkey = dictGetKey(bestde);
+                robj *bestval = (robj *) dictGetVal(bestde);
+
+                serverLog(LL_TODIS, "TODIS, eviction, break point 1");
+                serverLog(
+                        LL_TODIS,
+                        "TODIS, eviction bestkey: %s, bestval: %s",
+                        bestkey,
+                        bestval->ptr);
+
+                sds dramkey = sdsdup(bestkey);
+                robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
+                serverLog(LL_TODIS, "TODIS, eviction, break point 3");
+
+                serverLog(
+                        LL_TODIS,
+                        "TODIS, eviction dramkey: %s, dramval: %s",
+                        dramkey,
+                        dramval->ptr);
 
                 robj *keyobj = createStringObject(bestkey, sdslen(bestkey));
                 propagateExpire(db, keyobj);
+
                 /* We compute the amount of memory freed by dbDelete() alone.
                  * It is possible that actually the memory needed to propagte
                  * the DEL in AOF and replication link is greater than the one
@@ -3927,6 +3947,11 @@ int freePmemMemoryIfNeeded(void) {
                 pmem_freed += delta;
                 decrRefCount(keyobj);
                 keys_freed++;
+
+                /* Adds DRAM dict entry to DB */
+                keyobj = createStringObject(dramkey, sdslen(dramkey));
+                dbAdd(db, keyobj, dramval);
+                decrRefCount(keyobj);
             }
         }
         if (!keys_freed) {
@@ -3934,6 +3959,7 @@ int freePmemMemoryIfNeeded(void) {
         }
     }
 
+    serverLog(LL_TODIS, "##############################");
     return C_OK;
 }
 #endif
