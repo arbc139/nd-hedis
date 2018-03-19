@@ -45,9 +45,6 @@
 robj *createObject(int type, void *ptr) {
     robj *o = zmalloc(sizeof(*o));
     o->type = type;
-    #ifdef TODIS
-    o->location = LOCATION_DRAM;
-    #endif
     o->encoding = OBJ_ENCODING_RAW;
     o->ptr = ptr;
     o->refcount = 1;
@@ -62,9 +59,6 @@ robj *createObjectPM(int type, void *ptr) {
     robj *o = zmalloc(sizeof(*o));
 
     o->type = type;
-    #ifdef TODIS
-    o->location = LOCATION_PMEM;
-    #endif
     o->encoding = OBJ_ENCODING_RAW;
     o->ptr = ptr;
     o->refcount = 1;
@@ -98,9 +92,6 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     struct sdshdr8 *sh = (void*)(o+1);
 
     o->type = OBJ_STRING;
-    #ifdef TODIS
-    o->location = LOCATION_DRAM;
-    #endif
     o->encoding = OBJ_ENCODING_EMBSTR;
     o->ptr = sh+1;
     o->refcount = 1;
@@ -128,9 +119,6 @@ robj *createEmbeddedStringObjectPM(const char *ptr, size_t len) {
     struct sdshdr8 *sh = (void*)(o+1);
 
     o->type = OBJ_STRING;
-    #ifdef TODIS
-    o->location = LOCATION_PMEM;
-    #endif
     o->encoding = OBJ_ENCODING_EMBSTR;
     o->ptr = sh+1;
     o->refcount = 1;
@@ -257,7 +245,6 @@ robj *dupStringObject(robj *o) {
  * The resulting object always has refcount set to 1. */
 robj *dupStringObjectPM(robj *o) {
     robj *d;
-    char int_str_buf[1024];
 
     serverAssert(o->type == OBJ_STRING);
 

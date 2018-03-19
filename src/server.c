@@ -482,6 +482,15 @@ void dictObjectDestructorPM(void *privdata, dictEntry *entry, void *val)
 }
 #endif
 
+#ifdef TODIS
+void dictObjectDestructorTODIS(void *privdata, dictEntry *entry, void *val) {
+    if (entry->location == LOCATION_DRAM)
+        dictObjectDestructor(privdata, entry, val);
+    else
+        dictObjectDestructorPM(privdata, entry, val);
+}
+#endif
+
 void dictSdsDestructor(void *privdata, dictEntry *entry, void *val)
 {
     DICT_NOTUSED(privdata);
@@ -503,6 +512,15 @@ void dictSdsDestructorPM(void *privdata, dictEntry *entry, void *val)
     } TX_ONABORT {
         serverLog(LL_WARNING,"ERROR: removing an element from PM failed (%s)", __func__);
     } TX_END
+}
+#endif
+
+#ifdef TODIS
+void dictSdsDestructorTODIS(void *privdata, dictEntry *entry, void *val) {
+    if (entry->location == LOCATION_DRAM)
+        dictSdsDestructor(privdata, entry, val);
+    else
+        dictSdsDestructorPM(privdata, entry, val);
 }
 #endif
 
@@ -606,6 +624,17 @@ dictType dbDictTypePM = {
     dictSdsKeyCompare,          /* key compare */
     dictSdsDestructorPM,          /* key destructor */
     dictObjectDestructorPM   /* val destructor */
+};
+#endif
+
+#ifdef TODIS
+dictType dbDictTypeTODIS = {
+    dictSdsHash,                /* hash function */
+    NULL,                       /* key dup */
+    NULL,                       /* val dup */
+    dictSdsKeyCompare,          /* key compare */
+    dictSdsDestructorTODIS,     /* key destructor */
+    dictObjectDestructorTODIS   /* val destructor */
 };
 #endif
 
@@ -1971,15 +2000,21 @@ void initServer(void) {
 
     /* Create the Redis databases, and initialize other internal state. */
     for (j = 0; j < server.dbnum; j++) {
-#ifdef USE_PMDK
+#if defined(TODIS) && defined(USE_PMDK)
         if (server.persistent) {
-            server.db[j].dict = dictCreate(&dbDictTypePM,NULL);
-            
+            server.db[j].dict = dictCreate(&dbDictTypeTODIS, NULL);
             pm_type_root_type_id = TOID_TYPE_NUM(struct redis_pmem_root);
             pm_type_key_val_pair_PM = TOID_TYPE_NUM(struct key_val_pair_PM);
-        } else
+        }
+#elif !defined(TODIS) && defined(USE_PMDK)
+        if (server.persistent) {
+            server.db[j].dict = dictCreate(&dbDictTypePM,NULL);
+            pm_type_root_type_id = TOID_TYPE_NUM(struct redis_pmem_root);
+            pm_type_key_val_pair_PM = TOID_TYPE_NUM(struct key_val_pair_PM);
+        }
+#else
+        server.db[j].dict = dictCreate(&dbDictType,NULL);
 #endif
-            server.db[j].dict = dictCreate(&dbDictType,NULL);
         server.db[j].expires = dictCreate(&keyptrDictType,NULL);
         server.db[j].blocking_keys = dictCreate(&keylistDictType,NULL);
         server.db[j].ready_keys = dictCreate(&setDictType,NULL);
@@ -3692,15 +3727,21 @@ int freeMemoryIfNeeded(void) {
 
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void) {
-    serverLog(LL_VERBOSE, "TODIS, need to implements server.c/freePmemMemoryIfNeeded!");
     size_t pmem_used, pmem_tofree, pmem_freed;
 
     pmem_used = pmem_used_memory();
 
     /* Check if we are over the persistent memory limit. */
     if (pmem_used <= server.max_pmem_memory) return C_OK;
+
+    if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
+        return C_ERR; /* We need to free pmem memory, but policy forbids. */
+
+    /* Compute how much pmem memory we need to free. */
     pmem_tofree = pmem_used - server.max_pmem_memory;
     pmem_freed = 0;
+
+    serverLog(LL_VERBOSE, "TODIS, pmem eviction is fired.");
 
     while (pmem_freed < pmem_tofree) {
         int j, k, keys_freed = 0;
@@ -3712,11 +3753,105 @@ int freePmemMemoryIfNeeded(void) {
             redisDb *db = server.db + j;
             dict *dict;
 
-            // TODO(totoro): Implement maxmemory policy for persistent memory.
+            if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU ||
+                server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
+                dict = server.db[j].dict;
+            } else {
+                dict = server.db[j].expires;
+            }
+            if (dictSizePM(dict) == 0) continue;
+
+            /* volatile-random and allkeys-random policy */
+            if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM ||
+                server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_RANDOM) {
+                de = dictGetRandomKeyPM(dict);
+                bestkey = dictGetKey(de);
+            }
+
+            /* volatile-lru and allkeys-lru policy */
+            else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU ||
+                    server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_LRU) {
+               struct evictionPoolEntry *pool = db -> eviction_pool;
+
+               while (bestkey == NULL) {
+                   evictionPoolPopulate(dict, db->dict, db->eviction_pool);
+                   /* Go backward from best to worst element to evict. */
+                   for (k = MAXMEMORY_EVICTION_POOL_SIZE-1; k >= 0; k--) {
+                       if (pool[k].key == NULL) continue;
+                       de = dictFind(dict, pool[k].key);
+
+                       if (de->location == LOCATION_DRAM) continue;
+
+                       /* Remove the entry from the pool. */
+                       sdsfree(pool[k].key);
+                       /* Shift all elements on its right to left. */
+                       memmove(pool+k, pool+k+1,
+                               sizeof(pool[0])*(MAXMEMORY_EVICTION_POOL_SIZE-k-1));
+                       /* Clear the element on the right which is empty
+                        * since we shifted one position to the left. */
+                       pool[MAXMEMORY_EVICTION_POOL_SIZE-1].key = NULL;
+                       pool[MAXMEMORY_EVICTION_POOL_SIZE-1].idle = 0;
+
+                       /* If the key exists, is our pick. Otherwise it is
+                        * a ghost and we need to try the next element. */
+                       if (de) {
+                           bestkey = dictGetKey(de);
+                           break;
+                       } else {
+                           /* Ghost... */
+                           continue;
+                       }
+                   }
+               }
+            }
+
+            /* volatile-ttl */
+            else if (server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_TTL) {
+                for (k = 0; k < server.maxmemory_samples; k++) {
+                    sds thiskey;
+                    long thisval;
+
+                    de = dictGetRandomKeyPM(dict);
+                    thiskey = dictGetKey(de);
+                    thisval = (long) dictGetVal(de);
+
+                    /* Expire sooner (minor expire unix timestamp) is better
+                     * candidate for deletion */
+                    if (bestkey == NULL || thisval < bestval) {
+                        bestkey = thiskey;
+                        bestval = thisval;
+                    }
+                }
+            }
+
+            /* Finally remove the selected key. */
+            if (bestkey) {
+                long long delta;
+
+                robj *keyobj = createStringObject(bestkey, sdslen(bestkey));
+                propagateExpire(db, keyobj);
+                /* We compute the amount of memory freed by dbDelete() alone.
+                 * It is possible that actually the memory needed to propagte
+                 * the DEL in AOF and replication link is greater than the one
+                 * \we are freeing removing the key, but we can't account for
+                 * that otherwise we would never exit the loop.
+                 *
+                 * AOF and Output buffer memory will be freed eventually so
+                 * we only care about memory used by the key space. */
+                delta = (long long) server.used_pmem_memory;
+                dbDelete(db, keyobj);
+                delta -= server.used_pmem_memory;
+                pmem_freed += delta;
+                decrRefCount(keyobj);
+                keys_freed++;
+            }
+        }
+        if (!keys_freed) {
+            return C_ERR; /* nothing to free... */
         }
     }
 
-    return 0;
+    return C_OK;
 }
 #endif
 

@@ -52,6 +52,14 @@ typedef struct dictEntry {
         int64_t s64;
         double d;
     } v;
+#ifdef TODIS
+    /*
+     * TODIS - Data location : Memory or Persistent store
+     * 0 : DRAM, 1 : PMEM
+     * TODO Need to change as an atomic variable
+     * */
+    unsigned location:1;
+#endif
     struct dictEntry *next;
 } dictEntry;
 
@@ -71,6 +79,9 @@ typedef struct dictht {
     unsigned long size;
     unsigned long sizemask;
     unsigned long used;
+#ifdef TODIS
+    unsigned long pmem_used;
+#endif
 } dictht;
 
 typedef struct dict {
@@ -144,6 +155,9 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 #define dictGetDoubleVal(he) ((he)->v.d)
 #define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size)
 #define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used)
+#ifdef TODIS
+#define dictSizePM(d) ((d)->ht[0].pmem_used + (d)->ht[1].pmem_used)
+#endif
 #define dictIsRehashing(d) ((d)->rehashidx != -1)
 
 /* API */
@@ -164,6 +178,9 @@ dictIterator *dictGetSafeIterator(dict *d);
 dictEntry *dictNext(dictIterator *iter);
 void dictReleaseIterator(dictIterator *iter);
 dictEntry *dictGetRandomKey(dict *d);
+#ifdef TODIS
+dictEntry *dictGetRandomKeyPM(dict *d);
+#endif
 unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count);
 void dictGetStats(char *buf, size_t bufsize, dict *d);
 unsigned int dictGenHashFunction(const void *key, int len);

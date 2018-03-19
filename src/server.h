@@ -185,7 +185,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #endif
 
 #ifdef TODIS
-#define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024*1024*1024 /* 1GB */
+#define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024 /* 1KB */
 #define CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE CONFIG_MIN_MAX_PMEM_MEMORY_SIZE
 #endif
 
@@ -511,14 +511,6 @@ typedef long long mstime_t; /* millisecond time type. */
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
 typedef struct redisObject {
     unsigned type:4;
-    #ifdef TODIS
-    /*
-     * TODIS - Data location : Memory or Persistent store
-     * 0 : DRAM, 1 : PMEM
-     * TODO Need to change as an atomic variable
-     * */
-    unsigned location:1;
-    #endif
     unsigned encoding:4;
     unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */
     int refcount;

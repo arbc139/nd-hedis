@@ -169,6 +169,9 @@ static void _dictReset(dictht *ht)
     ht->size = 0;
     ht->sizemask = 0;
     ht->used = 0;
+#ifdef TODIS
+    ht->pmem_used = 0;
+#endif
 }
 
 /* Create a new hash table */
@@ -227,6 +230,9 @@ int dictExpand(dict *d, unsigned long size)
     n.sizemask = realsize-1;
     n.table = zcalloc(realsize*sizeof(dictEntry*));
     n.used = 0;
+#ifdef TODIS
+    n.pmem_used = 0;
+#endif
 
     /* Is this the first initialization? If so it's not really a rehashing
      * we just set the first hash table so that it can accept keys. */
@@ -276,6 +282,13 @@ int dictRehash(dict *d, int n) {
             d->ht[1].table[h] = de;
             d->ht[0].used--;
             d->ht[1].used++;
+#ifdef TODIS
+            if (de->location == LOCATION_PMEM) {
+                d->ht[0].pmem_used--;
+                d->ht[1].pmem_used++;
+            }
+                    
+#endif
             de = nextde;
         }
         d->ht[0].table[d->rehashidx] = NULL;
@@ -387,6 +400,10 @@ dictEntry *dictAddRaw(dict *d, void *key)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
+#ifdef TODIS
+    entry->location = LOCATION_DRAM;
+    serverLog(LL_VERBOSE, "TODIS, dictAddRaw pmem used: %d", ht->pmem_used);
+#endif
 
     /* Set the hash entry fields. */
     dictSetKey(d, entry, key);
@@ -433,6 +450,11 @@ dictEntry *dictAddRawPM(dict *d, void *key)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
+#ifdef TODIS
+    ht->pmem_used++;
+    entry->location = LOCATION_PMEM;
+    serverLog(LL_VERBOSE, "TODIS, dictAddRawPM pmem used: %d", ht->pmem_used);
+#endif
 
     /* Set the hash entry fields. */
     dictSetKey(d, entry, key);
@@ -464,6 +486,11 @@ dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
+#ifdef TODIS
+    ht->pmem_used++;
+    entry->location = LOCATION_PMEM;
+    serverLog(LL_VERBOSE, "TODIS, dictAddReconstructedPM pmem used: %d", ht->pmem_used);
+#endif
 
     dictSetKey(d, entry, key);
     dictSetVal(d, entry, val_robj);
@@ -563,6 +590,11 @@ static int dictGenericDelete(dict *d, const void *key, int nofree)
                     dictFreeKey(d, he);
                     dictFreeVal(d, he);
                 }
+#ifdef TODIS
+                if (he->location == LOCATION_PMEM) {
+                    d->ht[table].pmem_used--;
+                }
+#endif
                 zfree(he);
                 d->ht[table].used--;
                 return DICT_OK;
@@ -598,6 +630,11 @@ int _dictClear(dict *d, dictht *ht, void(callback)(void *)) {
             nextHe = he->next;
             dictFreeKey(d, he);
             dictFreeVal(d, he);
+#ifdef TODIS
+            if (he->location == LOCATION_PMEM) {
+                ht->pmem_used--;
+            }
+#endif
             zfree(he);
             ht->used--;
             he = nextHe;
@@ -792,6 +829,54 @@ dictEntry *dictGetRandomKey(dict *d)
     while(listele--) he = he->next;
     return he;
 }
+
+#ifdef TODIS
+/* Return a random entry from the hash table. Useful to
+ * implement randomized algorithms */
+dictEntry *dictGetRandomKeyPM(dict *d)
+{
+    dictEntry *he, *orighe;
+    unsigned int h;
+    int listlen, listele;
+
+    if (dictSize(d) == 0 || dictSizePM(d) == 0) return NULL;
+    if (dictIsRehashing(d)) _dictRehashStep(d);
+    do {
+        if (dictIsRehashing(d)) {
+            do {
+                /* We are sure there are no elements in indexes from 0
+                 * to rehashidx-1 */
+                h = d->rehashidx + (random() % (d->ht[0].size +
+                                                d->ht[1].size -
+                                                d->rehashidx));
+                he = (h >= d->ht[0].size) ? d->ht[1].table[h - d->ht[0].size] :
+                                          d->ht[0].table[h];
+            } while(he == NULL);
+        } else {
+            do {
+                h = random() & d->ht[0].sizemask;
+                he = d->ht[0].table[h];
+            } while(he == NULL);
+        }
+
+        /* Now we found a non empty bucket, but it is a linked
+         * list and we need to get a random element from the list.
+         * The only sane way to do so is counting the elements and
+         * select a random index. */
+        listlen = 0;
+        orighe = he;
+        while(he) {
+            he = he->next;
+            listlen++;
+        }
+        listele = random() % listlen;
+        he = orighe;
+        while(listele--) he = he->next;
+    } while (he->location == LOCATION_DRAM);
+
+    return he;
+}
+#endif
 
 /* This function samples the dictionary to return a few keys from random
  * locations.

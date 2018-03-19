@@ -89,11 +89,11 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 #ifdef USE_PMDK
     if (server.persistent) {
         int error = 0;
-        char int_str_buf[1024];
         robj *convertedVal = val;
 
 #ifdef TODIS
         if (val->encoding == OBJ_ENCODING_INT) {
+            char int_str_buf[1024];
             sprintf(int_str_buf, "%d", val->ptr);
             convertedVal = createStringObject(int_str_buf, strlen(int_str_buf));
         }
