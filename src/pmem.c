@@ -95,7 +95,7 @@ PMEMoid
 pmemAddToPmemList(void *key, void *val)
 {
     serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemADDToPmemList START");
+    serverLog(LL_TODIS, "TODIS, pmemAddToPmemList START");
     PMEMoid key_oid;
     PMEMoid val_oid;
     PMEMoid kv_PM;

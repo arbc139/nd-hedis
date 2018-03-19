@@ -346,6 +346,9 @@ int dictAdd(dict *d, void *key, void *val)
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAdd key: %s, val: %s", key, val);
+#endif
     return DICT_OK;
 }
 
@@ -357,6 +360,10 @@ int dictAddPM(dict *d, void *key, void *val)
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
+
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAddPM key: %s, val: %s", key, ((robj *)val)->ptr);
+#endif
 
     return DICT_OK;
 }
@@ -489,6 +496,7 @@ dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
     ht->pmem_used++;
     entry->location = LOCATION_PMEM;
     serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM pmem used: %ld", ht->pmem_used);
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM key: %s, val: %s", key, val);
 #endif
 
     dictSetKey(d, entry, key);

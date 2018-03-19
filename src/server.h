@@ -1382,6 +1382,7 @@ unsigned long zslGetRank(zskiplist *zsl, double score, robj *o);
 int freeMemoryIfNeeded(void);
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void);
+void writeStatusLogs(void);
 #endif
 int processCommand(client *c);
 void setupSignalHandlers(void);

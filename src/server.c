@@ -2097,6 +2097,9 @@ void initServer(void) {
     slowlogInit();
     latencyMonitorInit();
     bioInit();
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, server successfully initiated.");
+#endif
 }
 
 /* Populates the Redis Command Table starting from the hard coded list
