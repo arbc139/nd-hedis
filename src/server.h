@@ -387,10 +387,18 @@ typedef long long mstime_t; /* millisecond time type. */
 #define SORT_OP_GET 0
 
 /* Log levels */
+#ifdef TODIS
+#define LL_TODIS 0
+#define LL_DEBUG 1
+#define LL_VERBOSE 2
+#define LL_NOTICE 3
+#define LL_WARNING 4
+#else
 #define LL_DEBUG 0
 #define LL_VERBOSE 1
 #define LL_NOTICE 2
 #define LL_WARNING 3
+#endif
 #define LL_RAW (1<<10) /* Modifier to log without timestamp */
 #define CONFIG_DEFAULT_VERBOSITY LL_NOTICE
 

@@ -2535,6 +2535,10 @@ int processCommand(client *c) {
     }
 #endif
 
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODO(totoro): show pmem status");
+#endif
+
     /* Don't accept write commands if there are problems persisting on disk
      * and if this is a master instance. */
     if (((server.stop_writes_on_bgsave_err &&
