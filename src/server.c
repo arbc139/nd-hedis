@@ -318,7 +318,13 @@ void serverLogRaw(int level, const char *msg) {
     int log_to_stdout = server.logfile[0] == '\0';
 
     level &= 0xff; /* clear flags */
+#ifdef TODIS
+    if (
+        (server.todis_log_only && level != LL_TODIS) ||
+        (!server.todis_log_only && level < server.verbosity)) return;
+#else
     if (level < server.verbosity) return;
+#endif
 
     fp = log_to_stdout ? stdout : fopen(server.logfile,"a");
     if (!fp) return;
@@ -357,7 +363,13 @@ void serverLog(int level, const char *fmt, ...) {
     va_list ap;
     char msg[LOG_MAX_LEN];
 
+#ifdef TODIS
+    if (
+        (server.todis_log_only && (level&0xff) != LL_TODIS) ||
+        (!server.todis_log_only && (level&0xff) < server.verbosity)) return;
+#else
     if ((level&0xff) < server.verbosity) return;
+#endif
 
     va_start(ap, fmt);
     vsnprintf(msg, sizeof(msg), fmt, ap);
@@ -1565,6 +1577,7 @@ void initServerConfig(void) {
     server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
     server.max_pmem_memory_policy = CONFIG_DEFAULT_MAXMEMORY_POLICY;
+    server.todis_log_only = CONFIG_DEFAULT_TODIS_LOG_ONLY;
 #endif
     server.supervised = 0;
     server.supervised_mode = SUPERVISED_NONE;

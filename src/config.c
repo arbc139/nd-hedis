@@ -266,6 +266,13 @@ void loadServerConfigFromString(char *config) {
                       "Must be one of debug, verbose, notice, warning";
                 goto loaderr;
             }
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0],"todis-log-only") && argc == 2) {
+            if ((server.todis_log_only = yesnotoi(argv[1])) == -1) {
+                err = "argument must be 'yes' or 'no'"; goto loaderr;
+            }
+            serverLog(LL_WARNING, "TODIS, server todis log: %d", server.todis_log_only);
+#endif
         } else if (!strcasecmp(argv[0],"logfile") && argc == 2) {
             FILE *logfp;
 
@@ -921,6 +928,10 @@ void configSetCommand(client *c) {
 
     /* Boolean fields.
      * config_set_bool_field(name,var). */
+#ifdef TODIS
+    } config_set_bool_field(
+      "todis-log-only", server.todis_log_only) {
+#endif
     } config_set_bool_field(
       "rdbcompression", server.rdb_compression) {
     } config_set_bool_field(
@@ -1171,6 +1182,10 @@ void configGetCommand(client *c) {
     config_get_numerical_field("tcp-keepalive",server.tcpkeepalive);
 
     /* Bool (yes/no) values */
+#ifdef TODIS
+    config_get_bool_field("todis-log-only",
+            server.todis_log_only);
+#endif
     config_get_bool_field("cluster-require-full-coverage",
             server.cluster_require_full_coverage);
     config_get_bool_field("no-appendfsync-on-rewrite",
@@ -1867,6 +1882,9 @@ int rewriteConfig(char *path) {
     rewriteConfigBytesOption(state,"repl-backlog-size",server.repl_backlog_size,CONFIG_DEFAULT_REPL_BACKLOG_SIZE);
     rewriteConfigBytesOption(state,"repl-backlog-ttl",server.repl_backlog_time_limit,CONFIG_DEFAULT_REPL_BACKLOG_TIME_LIMIT);
     rewriteConfigYesNoOption(state,"repl-disable-tcp-nodelay",server.repl_disable_tcp_nodelay,CONFIG_DEFAULT_REPL_DISABLE_TCP_NODELAY);
+#ifdef TODIS
+    rewriteConfigYesNoOption(state,"todis-log-only",server.todis_log_only,CONFIG_DEFAULT_TODIS_LOG_ONLY);
+#endif
     rewriteConfigYesNoOption(state,"repl-diskless-sync",server.repl_diskless_sync,CONFIG_DEFAULT_REPL_DISKLESS_SYNC);
     rewriteConfigNumericalOption(state,"repl-diskless-sync-delay",server.repl_diskless_sync_delay,CONFIG_DEFAULT_REPL_DISKLESS_SYNC_DELAY);
     rewriteConfigNumericalOption(state,"slave-priority",server.slave_priority,CONFIG_DEFAULT_SLAVE_PRIORITY);

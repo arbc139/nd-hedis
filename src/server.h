@@ -187,6 +187,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #ifdef TODIS
 #define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024 /* 1KB */
 #define CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE CONFIG_MIN_MAX_PMEM_MEMORY_SIZE
+#define CONFIG_DEFAULT_TODIS_LOG_ONLY 0
 #endif
 
 #define ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 20 /* Loopkups per loop. */
@@ -387,12 +388,17 @@ typedef long long mstime_t; /* millisecond time type. */
 #define SORT_OP_GET 0
 
 /* Log levels */
+#ifdef TODIS
+#define LL_TODIS 0
+#define LL_DEBUG 1
+#define LL_VERBOSE 2
+#define LL_NOTICE 3
+#define LL_WARNING 4
+#else
 #define LL_DEBUG 0
 #define LL_VERBOSE 1
 #define LL_NOTICE 2
 #define LL_WARNING 3
-#ifdef TODIS
-#define LL_TODIS 4
 #endif
 #define LL_RAW (1<<10) /* Modifier to log without timestamp */
 #define CONFIG_DEFAULT_VERBOSITY LL_NOTICE
@@ -860,6 +866,7 @@ struct redisServer {
     size_t used_pmem_memory;        /* Used memory capacity in pmem */
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
     int max_pmem_memory_policy;     /* Policy for key eviction */
+    int todis_log_only;             /* Force to write todis log only */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
