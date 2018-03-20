@@ -1506,6 +1506,8 @@ void setKeyPM(redisDb *db, robj *key, robj *val);
 int dbExists(redisDb *db, robj *key);
 robj *dbRandomKey(redisDb *db);
 int dbDelete(redisDb *db, robj *key);
+dictEntry *dbDeleteNoFree(redisDb *db, robj *key);
+void dbFreeEntry(redisDb *db, dictEntry *de);
 robj *dbUnshareStringValue(redisDb *db, robj *key, robj *o);
 long long emptyDb(void(callback)(void*));
 int selectDb(client *c, int id);

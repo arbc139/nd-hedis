@@ -292,6 +292,16 @@ int dbDelete(redisDb *db, robj *key) {
     }
 }
 
+dictEntry *dbDeleteNoFree(redisDb *db, robj *key) {
+    /* Deleting an entry from the expires dict will not free the sds of
+     * the key, because it is shared with the main dictionary. */
+    return dictUnlink(db->dict, key->ptr);
+}
+
+void dbFreeEntry(redisDb *db, dictEntry *de) {
+    dictFreeUnlinkedEntry(db->dict, de);
+}
+
 /* Prepare the string object stored at 'key' to be modified destructively
  * to implement commands like SETBIT or APPEND.
  *

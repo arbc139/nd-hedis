@@ -3930,7 +3930,6 @@ int freePmemMemoryIfNeeded(void) {
                 sds bestkey = dictGetKey(bestde);
                 robj *bestval = (robj *) dictGetVal(bestde);
 
-                serverLog(LL_TODIS, "TODIS, eviction, break point 1");
                 serverLog(
                         LL_TODIS,
                         "TODIS, eviction bestkey: %s, bestval: %s",
@@ -3939,7 +3938,6 @@ int freePmemMemoryIfNeeded(void) {
 
                 sds dramkey = sdsdup(bestkey);
                 robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
-                serverLog(LL_TODIS, "TODIS, eviction, break point 3");
 
                 serverLog(
                         LL_TODIS,
@@ -3948,9 +3946,18 @@ int freePmemMemoryIfNeeded(void) {
                         dramval->ptr);
 
                 robj *keyobj = createStringObject(bestkey, sdslen(bestkey));
-                propagateExpire(db, keyobj);
+                /* Unlink PMEM dictEntry from DB. */
+                dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
 
-                /* We compute the amount of memory freed by dbDelete() alone.
+                /* Adds DRAM dictEntry to DB. */
+                robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
+                dbAdd(db, dramkeyobj, dramval);
+                decrRefCount(dramkeyobj);
+
+                // TODO(totoro): Implements feeding aof logging for DRAM eviction.
+
+                /* Remove PMEM dictEntry from pmem.
+                 * We compute the amount of memory freed by dbDelete() alone.
                  * It is possible that actually the memory needed to propagte
                  * the DEL in AOF and replication link is greater than the one
                  * \we are freeing removing the key, but we can't account for
@@ -3959,16 +3966,11 @@ int freePmemMemoryIfNeeded(void) {
                  * AOF and Output buffer memory will be freed eventually so
                  * we only care about memory used by the key space. */
                 delta = (long long) server.used_pmem_memory;
-                dbDelete(db, keyobj);
+                dbFreeEntry(db, pmementry);
                 delta -= server.used_pmem_memory;
                 pmem_freed += delta;
                 decrRefCount(keyobj);
                 keys_freed++;
-
-                /* Adds DRAM dict entry to DB */
-                keyobj = createStringObject(dramkey, sdslen(dramkey));
-                dbAdd(db, keyobj, dramval);
-                decrRefCount(keyobj);
             }
         }
         if (!keys_freed) {

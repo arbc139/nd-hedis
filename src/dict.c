@@ -572,13 +572,13 @@ dictEntry *dictReplaceRaw(dict *d, void *key) {
 }
 
 /* Search and remove an element */
-static int dictGenericDelete(dict *d, const void *key, int nofree)
+static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree)
 {
     unsigned int h, idx;
     dictEntry *he, *prevHe;
     int table;
 
-    if (d->ht[0].size == 0) return DICT_ERR; /* d->ht[0].table is NULL */
+    if (d->ht[0].size == 0) return NULL; /* d->ht[0].table is NULL */
     if (dictIsRehashing(d)) _dictRehashStep(d);
     h = dictHashKey(d, key);
 
@@ -596,30 +596,37 @@ static int dictGenericDelete(dict *d, const void *key, int nofree)
                 if (!nofree) {
                     dictFreeKey(d, he);
                     dictFreeVal(d, he);
+                    zfree(he);
                 }
 #ifdef TODIS
                 if (he->location == LOCATION_PMEM) {
                     d->ht[table].pmem_used--;
                 }
 #endif
-                zfree(he);
                 d->ht[table].used--;
-                return DICT_OK;
+                return he;
             }
             prevHe = he;
             he = he->next;
         }
         if (!dictIsRehashing(d)) break;
     }
-    return DICT_ERR; /* not found */
+    return NULL; /* not found */
 }
 
 int dictDelete(dict *ht, const void *key) {
-    return dictGenericDelete(ht,key,0);
+    return dictGenericDelete(ht,key,0) ? DICT_OK : DICT_ERR;
 }
 
-int dictDeleteNoFree(dict *ht, const void *key) {
+dictEntry *dictUnlink(dict *ht, const void *key) {
     return dictGenericDelete(ht,key,1);
+}
+
+void dictFreeUnlinkedEntry(dict *d, dictEntry *he) {
+    if (he == NULL) return;
+    dictFreeKey(d, he);
+    dictFreeVal(d, he);
+    zfree(he);
 }
 
 /* Destroy an entire dictionary */
