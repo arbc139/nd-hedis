@@ -146,6 +146,13 @@ robj *lookupKeyWrite(redisDb *db, robj *key) {
     return lookupKey(db,key,LOOKUP_NONE);
 }
 
+#ifdef TODIS
+dictEntry *lookupKeyWriteEntry(redisDb *db, robj* key) {
+    expireIfNeeded(db, key);
+    return lookupKeyEntry(db, key);
+}
+#endif
+
 robj *lookupKeyReadOrReply(client *c, robj *key, robj *reply) {
     robj *o = lookupKeyRead(c->db, key);
     if (!o) addReply(c,reply);
@@ -220,7 +227,11 @@ void dbOverwritePM(redisDb *db, robj *key, robj *val) {
     dictEntry *de = dictFind(db->dict,key->ptr);
 
     serverAssertWithInfo(NULL,key,de != NULL);
+#ifdef TODIS
+    dictReplaceTODIS(db->dict, key->ptr, val);
+#else
     dictReplacePM(db->dict, key->ptr, val);
+#endif
 }
 #endif
 
@@ -244,9 +255,15 @@ void setKey(redisDb *db, robj *key, robj *val) {
 #ifdef USE_PMDK
 /* High level Set operation. Used for PM */
 void setKeyPM(redisDb *db, robj *key, robj *val) {
-    if (lookupKeyWrite(db,key) == NULL) {
+    dictEntry *de = lookupKeyWriteEntry(db, key);
+    if (de == NULL) {
         dbAddPM(db,key,val);
     } else {
+#ifdef TODIS
+        if (de->location == LOCATION_DRAM) {
+            propagateExpireTODIS(db, de);
+        }
+#endif
         dbOverwritePM(db,key,val);
     }
     /* TODO: incrRefCount(val); */

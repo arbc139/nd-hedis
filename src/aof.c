@@ -444,6 +444,9 @@ void flushAppendOnlyFile(int force) {
         if (!sync_in_progress) aof_background_fsync(server.aof_fd);
         server.aof_last_fsync = server.unixtime;
     }
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, flushAppendOnlyFile FINISHED");
+#endif
 }
 
 sds catAppendOnlyGenericCommand(sds dst, int argc, robj **argv) {
@@ -571,7 +574,7 @@ void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
     serverLog(LL_TODIS, "   ");
     serverLog(LL_TODIS, "TODIS, feedAppendOnlyFile START");
 
-    argv[0] = createStringObject("SET", 3);
+    argv[0] = createStringObject("AOFSET", 6);
     argv[1] = key;
     argv[2] = val;
     incrRefCount(argv[0]);
@@ -582,7 +585,7 @@ void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
     serverLog(LL_TODIS, "TODIS, key: %s", argv[1]->ptr);
     serverLog(LL_TODIS, "TODIS, value: %s", argv[2]->ptr);
 
-    feedAppendOnlyFile(server->setCommand, db->id, argv, 3);
+    feedAppendOnlyFile(server.aofSetCommand, db->id, argv, 3);
 
     decrRefCount(argv[0]);
     decrRefCount(argv[1]);
@@ -644,6 +647,9 @@ void freeFakeClient(struct client *c) {
  * error (the append only file is zero-length) C_ERR is returned. On
  * fatal error an error message is logged and the program exists. */
 int loadAppendOnlyFile(char *filename) {
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, loadAppendOnlyFile START");
+#endif
     struct client *fakeClient;
     FILE *fp = fopen(filename,"r");
     struct redis_stat sb;
@@ -753,6 +759,9 @@ loaded_ok: /* DB loaded, cleanup and return C_OK to the caller. */
     stopLoading();
     aofUpdateCurrentSize();
     server.aof_rewrite_base_size = server.aof_current_size;
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, loadAppendOnlyFile END");
+#endif
     return C_OK;
 
 readerr: /* Read error. If feof(fp) is true, fall through to unexpected EOF. */

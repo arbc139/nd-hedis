@@ -94,7 +94,7 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 #ifdef TODIS
         if (val->encoding == OBJ_ENCODING_INT) {
             char int_str_buf[1024];
-            sprintf(int_str_buf, "%d", val->ptr);
+            sprintf(int_str_buf, "%lld", val->ptr);
             convertedVal = createStringObject(int_str_buf, strlen(int_str_buf));
         }
 #endif

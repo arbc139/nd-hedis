@@ -559,6 +559,51 @@ int dictReplacePM(dict *d, void *key, void *val)
 }
 #endif
 
+#ifdef TODIS
+/* Add an element, discarding the old if the key already exists.
+ * Return 1 if the key was added from scratch, 0 if there was already an
+ * element with such key and dictReplace() just performed a value update
+ * operation. */
+int dictReplaceTODIS(dict *d, void *key, void *val)
+{
+    dictEntry *entry, auxentry;
+
+    /* Try to add the element. If the key
+     * does not exists dictAdd will suceed. */
+    if (dictAddPM(d, key, val) == DICT_OK)
+        return 1;
+    /* It already exists, get the entry */
+    entry = dictFind(d, key);
+    /* Set the new value and free the old one. Note that it is important
+     * to do that in this order, as the value may just be exactly the same
+     * as the previous one. In this context, think to reference counting,
+     * you want to increment (set), and then decrement (free), and not the
+     * reverse. */
+    if (entry->location == LOCATION_DRAM) {
+        PMEMoid kv_PM;
+        PMEMoid *kv_pm_reference;
+
+        sds copy = sdsdupPM(key, (void **) &kv_pm_reference);
+        dictFreeKey(d, entry);
+        dictFreeVal(d, entry);
+        dictSetKey(d, entry, copy);
+        entry->location = LOCATION_PMEM;
+        dictht *ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+        ht->pmem_used++;
+        dictSetVal(d, entry, val);
+
+       kv_PM = pmemAddToPmemList((void *)copy, (void *)(((robj *)val)->ptr));
+        *kv_pm_reference = kv_PM;
+        return 0;
+    } else {
+        auxentry = *entry;
+        dictSetVal(d, entry, val);
+        pmemKVpairSet(entry->key, ((robj *)val)->ptr);
+        dictFreeVal(d, &auxentry);
+        return 0;
+    }
+}
+#endif
 /* dictReplaceRaw() is simply a version of dictAddRaw() that always
  * returns the hash entry of the specified key, even if the key already
  * exists and can't be added (in that case the entry of the already

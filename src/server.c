@@ -297,6 +297,7 @@ struct redisCommand redisCommandTable[] = {
     {"post",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
     {"host:",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
 #ifdef TODIS
+    {"aofset",aofSetCommand,-3,"wm",0,NULL,1,1,1,0,0},
     {"pmemstatus",getPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"dramstatus",getDramStatusCommand,1,"r",0,NULL,0,0,0,0,0},
 #endif
@@ -1691,7 +1692,7 @@ void initServerConfig(void) {
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
     populateCommandTable();
 #ifdef TODIS
-    server.setCommand = lookupCommandByCString("set");
+    server.aofSetCommand = lookupCommandByCString("aofset");
 #endif
     server.delCommand = lookupCommandByCString("del");
     server.multiCommand = lookupCommandByCString("multi");

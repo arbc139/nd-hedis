@@ -812,7 +812,7 @@ struct redisServer {
     struct redisCommand *delCommand, *multiCommand, *lpushCommand, *lpopCommand,
                         *rpopCommand, *sremCommand, *execCommand;
 #ifdef TODIS
-    struct redisCommand *setCommand;
+    struct redisCommand *aofSetCommand;
 #endif
     /* Fields used only for stats */
     time_t stat_starttime;          /* Server start time */
@@ -1502,7 +1502,8 @@ robj *lookupKeyReadOrReply(client *c, robj *key, robj *reply);
 robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply);
 robj *lookupKeyReadWithFlags(redisDb *db, robj *key, int flags);
 #ifdef TODIS
-dictEntry *lookupKeyEntry(redisDb* db, robj *key);
+dictEntry *lookupKeyWriteEntry(redisDb *db, robj *key);
+dictEntry *lookupKeyEntry(redisDb *db, robj *key);
 #endif
 #define LOOKUP_NONE 0
 #define LOOKUP_NOTOUCH (1<<0)
@@ -1748,6 +1749,7 @@ void pfdebugCommand(client *c);
 void latencyCommand(client *c);
 void securityWarningCommand(client *c);
 #ifdef TODIS
+void aofSetCommand(client *c);
 void getPmemStatusCommand(client *c);
 void getDramStatusCommand(client *c);
 #endif
