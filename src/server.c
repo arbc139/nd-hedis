@@ -822,7 +822,11 @@ int activeExpireCycleTryExpire(redisDb *db, dictEntry *de, long long now) {
         sds key = dictGetKey(de);
         robj *keyobj = createStringObject(key,sdslen(key));
 
+#ifdef TODIS
+        propagateExpireTODIS(db, de);
+#else
         propagateExpire(db,keyobj);
+#endif
         dbDelete(db,keyobj);
         notifyKeyspaceEvent(NOTIFY_EXPIRED,
             "expired",keyobj,db->id);
@@ -1686,6 +1690,9 @@ void initServerConfig(void) {
     server.commands = dictCreate(&commandTableDictType,NULL);
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
     populateCommandTable();
+#ifdef TODIS
+    server.setCommand = lookupCommandByCString("set");
+#endif
     server.delCommand = lookupCommandByCString("del");
     server.multiCommand = lookupCommandByCString("multi");
     server.lpushCommand = lookupCommandByCString("lpush");
@@ -2250,8 +2257,10 @@ struct redisCommand *lookupCommandOrOriginal(sds name) {
 void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
                int flags)
 {
+#ifndef TODIS
     if (server.aof_state != AOF_OFF && flags & PROPAGATE_AOF)
         feedAppendOnlyFile(cmd,dbid,argv,argc);
+#endif
     if (flags & PROPAGATE_REPL)
         replicationFeedSlaves(server.slaves,dbid,argv,argc);
 }
@@ -3702,10 +3711,10 @@ int freeMemoryIfNeeded(void) {
 
         for (j = 0; j < server.dbnum; j++) {
             long bestval = 0; /* just to prevent warning */
-            sds bestkey = NULL;
             dictEntry *de;
             redisDb *db = server.db+j;
             dict *dict;
+            dictEntry *bestde;
 
             if (server.maxmemory_policy == MAXMEMORY_ALLKEYS_LRU ||
                 server.maxmemory_policy == MAXMEMORY_ALLKEYS_RANDOM)
@@ -3720,8 +3729,7 @@ int freeMemoryIfNeeded(void) {
             if (server.maxmemory_policy == MAXMEMORY_ALLKEYS_RANDOM ||
                 server.maxmemory_policy == MAXMEMORY_VOLATILE_RANDOM)
             {
-                de = dictGetRandomKey(dict);
-                bestkey = dictGetKey(de);
+                bestde = dictGetRandomKey(dict);
             }
 
             /* volatile-lru and allkeys-lru policy */
@@ -3730,7 +3738,7 @@ int freeMemoryIfNeeded(void) {
             {
                 struct evictionPoolEntry *pool = db->eviction_pool;
 
-                while(bestkey == NULL) {
+                while(bestde == NULL) {
                     evictionPoolPopulate(dict, db->dict, db->eviction_pool);
                     /* Go backward from best to worst element to evict. */
                     for (k = MAXMEMORY_EVICTION_POOL_SIZE-1; k >= 0; k--) {
@@ -3750,7 +3758,7 @@ int freeMemoryIfNeeded(void) {
                         /* If the key exists, is our pick. Otherwise it is
                          * a ghost and we need to try the next element. */
                         if (de) {
-                            bestkey = dictGetKey(de);
+                            bestde = de;
                             break;
                         } else {
                             /* Ghost... */
@@ -3767,24 +3775,28 @@ int freeMemoryIfNeeded(void) {
                     long thisval;
 
                     de = dictGetRandomKey(dict);
-                    thiskey = dictGetKey(de);
                     thisval = (long) dictGetVal(de);
 
                     /* Expire sooner (minor expire unix timestamp) is better
                      * candidate for deletion */
-                    if (bestkey == NULL || thisval < bestval) {
-                        bestkey = thiskey;
+                    if (bestde == NULL || thisval < bestval) {
+                        bestde = de;
                         bestval = thisval;
                     }
                 }
             }
 
             /* Finally remove the selected key. */
-            if (bestkey) {
+            if (bestde != NULL) {
                 long long delta;
 
+                sds bestkey = dictGetKey(bestde);
                 robj *keyobj = createStringObject(bestkey,sdslen(bestkey));
+#ifdef TODIS
+                propagateExpireTODIS(db, bestde);
+#else
                 propagateExpire(db,keyobj);
+#endif
                 /* We compute the amount of memory freed by dbDelete() alone.
                  * It is possible that actually the memory needed to propagate
                  * the DEL in AOF and replication link is greater than the one
@@ -3952,9 +3964,9 @@ int freePmemMemoryIfNeeded(void) {
                 /* Adds DRAM dictEntry to DB. */
                 robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
                 dbAdd(db, dramkeyobj, dramval);
+                /* Evicts to aof logs. */
+                feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
                 decrRefCount(dramkeyobj);
-
-                // TODO(totoro): Implements feeding aof logging for DRAM eviction.
 
                 /* Remove PMEM dictEntry from pmem.
                  * We compute the amount of memory freed by dbDelete() alone.
@@ -4182,6 +4194,9 @@ void loadDataFromDisk(void) {
     if (server.aof_state == AOF_ON) {
         if (loadAppendOnlyFile(server.aof_filename) == C_OK)
             serverLog(LL_NOTICE,"DB loaded from append only file: %.3f seconds",(float)(ustime()-start)/1000000);
+#ifdef TODIS
+            serverLog(LL_TODIS,"TODIS, DB loaded from append only file: %.3f seconds",(float)(ustime()-start)/1000000);
+#endif
     } else {
         if (rdbLoad(server.rdb_filename) == C_OK) {
             serverLog(LL_NOTICE,"DB loaded from disk: %.3f seconds",
@@ -4515,8 +4530,14 @@ int main(int argc, char **argv) {
             long long start = ustime();
             if (pmemReconstruct() == C_OK) {
                 serverLog(LL_NOTICE,"DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
+#ifdef TODIS
+                serverLog(LL_TODIS,"TODIS, DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
+#endif
             } else if (errno != ENOENT) {
                 serverLog(LL_WARNING,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
+#ifdef TODIS
+                serverLog(LL_TODIS,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
+#endif
                 exit(1);
             }
 	}

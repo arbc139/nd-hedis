@@ -558,6 +558,39 @@ void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int a
     sdsfree(buf);
 }
 
+#ifdef TODIS
+/**
+ * feedAppendOnlyFileTODIS
+ * AOF feed implementation for TODIS.
+ * DB: target DB.
+ * key: Evicted DRAM key
+ * val: Evicted DRAM val
+ */
+void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
+    robj *argv[3];
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, feedAppendOnlyFile START");
+
+    argv[0] = createStringObject("SET", 3);
+    argv[1] = key;
+    argv[2] = val;
+    incrRefCount(argv[0]);
+    incrRefCount(argv[1]);
+    incrRefCount(argv[2]);
+
+    serverLog(LL_TODIS, "TODIS, command: %s", argv[0]->ptr);
+    serverLog(LL_TODIS, "TODIS, key: %s", argv[1]->ptr);
+    serverLog(LL_TODIS, "TODIS, value: %s", argv[2]->ptr);
+
+    feedAppendOnlyFile(server->setCommand, db->id, argv, 3);
+
+    decrRefCount(argv[0]);
+    decrRefCount(argv[1]);
+    decrRefCount(argv[2]);
+    serverLog(LL_TODIS, "TODIS, feedAppendOnlyFile END");
+}
+#endif
+
 /* ----------------------------------------------------------------------------
  * AOF loading
  * ------------------------------------------------------------------------- */

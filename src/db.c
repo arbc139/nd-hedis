@@ -158,6 +158,12 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
     return o;
 }
 
+#ifdef TODIS
+dictEntry *lookupKeyEntry(redisDb *db, robj *key) {
+    return dictFind(db->dict, key->ptr);
+}
+#endif
+
 /* Add the key to the DB. It's up to the caller to increment the reference
  * counter of the value if needed.
  *
@@ -960,6 +966,38 @@ void propagateExpire(redisDb *db, robj *key) {
     decrRefCount(argv[1]);
 }
 
+#ifdef TODIS
+/* Propagate expires into slaves and the AOF file.
+ * When a key expires in the master, a DEL operation for this key is sent
+ * to all the slaves and the AOF file if enabled.
+ *
+ * This way the key expiry is centralized in one place, and since both
+ * AOF and the master->slave link guarantee operation ordering, everything
+ * will be consistent even if we allow write operations against expiring
+ * keys. */
+void propagateExpireTODIS(redisDb *db, dictEntry *entry) {
+    robj *argv[2];
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, propagateExpireTODIS START");
+
+    sds key = dictGetKey(entry);
+    robj *keyobj = createStringObject(key, sdslen(key));
+
+    argv[0] = shared.del;
+    argv[1] = keyobj;
+    incrRefCount(argv[0]);
+    incrRefCount(argv[1]);
+
+    if (entry->location == LOCATION_DRAM && server.aof_state != AOF_OFF)
+        feedAppendOnlyFile(server.delCommand,db->id,argv,2);
+    replicationFeedSlaves(server.slaves,db->id,argv,2);
+
+    decrRefCount(argv[0]);
+    decrRefCount(argv[1]);
+    serverLog(LL_TODIS, "TODIS, propagateExpireTODIS END");
+}
+#endif
+
 int expireIfNeeded(redisDb *db, robj *key) {
     mstime_t when = getExpire(db,key);
     mstime_t now;
@@ -990,7 +1028,12 @@ int expireIfNeeded(redisDb *db, robj *key) {
 
     /* Delete the key */
     server.stat_expiredkeys++;
+#ifdef TODIS
+    dictEntry *entry = lookupKeyEntry(db, key);
+    propagateExpireTODIS(db, entry);
+#else
     propagateExpire(db,key);
+#endif
     notifyKeyspaceEvent(NOTIFY_EXPIRED,
         "expired",key,db->id);
     return dbDelete(db,key);
