@@ -300,6 +300,8 @@ struct redisCommand redisCommandTable[] = {
     {"aofset",aofSetCommand,-3,"wm",0,NULL,1,1,1,0,0},
     {"pmemstatus",getPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"dramstatus",getDramStatusCommand,1,"r",0,NULL,0,0,0,0,0},
+    {"lpmemstatus",getListPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
+    {"rlpmemstatus",getReverseListPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
 #endif
     {"latency",latencyCommand,-2,"aslt",0,NULL,0,0,0,0,0}
 };

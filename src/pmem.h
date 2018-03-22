@@ -43,6 +43,7 @@ void pmemKVpairSet(void *key, void *val);
 PMEMoid pmemAddToPmemList(void *key, void *val);
 void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
 #ifdef TODIS
+void pmemKVpairSetRearrangeList(void *key, void *val);
 size_t pmem_used_memory(void);
 #endif
 #endif

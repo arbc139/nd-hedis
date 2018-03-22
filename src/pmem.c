@@ -91,6 +91,22 @@ void pmemKVpairSet(void *key, void *val)
     return;
 }
 
+#ifdef TODIS
+void pmemKVpairSetRearrangeList(void *key, void *val)
+{
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList START");
+    PMEMoid *kv_PM_oid;
+
+    kv_PM_oid = sdsPMEMoidBackReference((sds)key);
+    pmemRemoveFromPmemList(*kv_PM_oid);
+    PMEMoid new_kv_PM_oid = pmemAddToPmemList(key, val);
+    *kv_PM_oid = new_kv_PM_oid;
+    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList END");
+    return;
+}
+#endif
+
 PMEMoid
 pmemAddToPmemList(void *key, void *val)
 {
@@ -109,6 +125,12 @@ pmemAddToPmemList(void *key, void *val)
     val_oid.pool_uuid_lo = server.pool_uuid_lo;
     val_oid.off = (uint64_t)val - (uint64_t)server.pm_pool->addr;
 
+    kv_PM = pmemobj_tx_zalloc(sizeof(struct key_val_pair_PM), pm_type_key_val_pair_PM);
+    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct(kv_PM);
+    kv_PM_p->key_oid = key_oid;
+    kv_PM_p->val_oid = val_oid;
+    typed_kv_PM.oid = kv_PM;
+
 #ifdef TODIS
         serverLog(
                 LL_TODIS,
@@ -116,11 +138,6 @@ pmemAddToPmemList(void *key, void *val)
                 sizeof(struct key_val_pair_PM));
     server.used_pmem_memory += sizeof(struct key_val_pair_PM);
 #endif
-    kv_PM = pmemobj_tx_zalloc(sizeof(struct key_val_pair_PM), pm_type_key_val_pair_PM);
-    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct(kv_PM);
-    kv_PM_p->key_oid = key_oid;
-    kv_PM_p->val_oid = val_oid;
-    typed_kv_PM.oid = kv_PM;
 
     root = pmemobj_direct(server.pm_rootoid.oid);
 
@@ -129,6 +146,10 @@ pmemAddToPmemList(void *key, void *val)
         struct key_val_pair_PM *head = D_RW(root->pe_first);
         TX_ADD_FIELD_DIRECT(head,pmem_list_prev);
     	head->pmem_list_prev = typed_kv_PM;
+    }
+
+    if(TOID_IS_NULL(root->pe_last)) {
+        root->pe_last = typed_kv_PM;
     }
 
     TX_ADD_DIRECT(root);
@@ -155,13 +176,6 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
 
     typed_kv_PM.oid = kv_PM_oid;
 
-    if(TOID_EQUALS(root->pe_first, typed_kv_PM)) {
-    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO(typed_kv_PM)->pmem_list_next;
-    	if(!TOID_IS_NULL(typed_kv_PM_next)){
-    		struct key_val_pair_PM *next = D_RW(typed_kv_PM_next);
-    		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
-    		next->pmem_list_prev.oid = OID_NULL;
-    	}
 #ifdef TODIS
         serverLog(
                 LL_TODIS,
@@ -169,10 +183,43 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
                 sizeof(struct key_val_pair_PM));
         server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
 #endif
+
+    if (TOID_EQUALS(root->pe_first, typed_kv_PM) &&
+        TOID_EQUALS(root->pe_last, typed_kv_PM)) {
+        TX_FREE(root->pe_first);
+        TX_ADD_DIRECT(root);
+        root->pe_first = TOID_NULL(struct key_val_pair_PM);
+        root->pe_last = TOID_NULL(struct key_val_pair_PM);
+        root->num_dict_entries--;
+        serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
+        return;
+    }
+    else if(TOID_EQUALS(root->pe_first, typed_kv_PM)) {
+    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO(typed_kv_PM)->pmem_list_next;
+    	if(!TOID_IS_NULL(typed_kv_PM_next)){
+    		struct key_val_pair_PM *next = D_RW(typed_kv_PM_next);
+    		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
+    		next->pmem_list_prev.oid = OID_NULL;
+    	}
     	TX_FREE(root->pe_first);
     	TX_ADD_DIRECT(root);
     	root->pe_first = typed_kv_PM_next;
         root->num_dict_entries--;
+        serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
+        return;
+    }
+    else if (TOID_EQUALS(root->pe_last, typed_kv_PM)) {
+        TOID(struct key_val_pair_PM) typed_kv_PM_prev = D_RO(typed_kv_PM)->pmem_list_prev;
+        if (!TOID_IS_NULL(typed_kv_PM_prev)) {
+            struct key_val_pair_PM *prev = D_RW(typed_kv_PM_prev);
+            TX_ADD_FIELD_DIRECT(prev, pmem_list_next);
+            prev->pmem_list_next.oid = OID_NULL;
+        }
+        TX_FREE(root->pe_last);
+        TX_ADD_DIRECT(root);
+        root->pe_last = typed_kv_PM_prev;
+        root->num_dict_entries--;
+        serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
         return;
     }
     else {
@@ -188,21 +235,12 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
     		next->pmem_list_prev = typed_kv_PM_prev;
     	}
- #ifdef TODIS
-        serverLog(
-                LL_TODIS,
-                "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
-                sizeof(struct key_val_pair_PM));
-        server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
-#endif
     	TX_FREE(typed_kv_PM);
     	TX_ADD_FIELD_DIRECT(root,num_dict_entries);
         root->num_dict_entries--;
+        serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
         return;
     }
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
-#endif
 }
 #endif
 

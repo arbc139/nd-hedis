@@ -592,13 +592,13 @@ int dictReplaceTODIS(dict *d, void *key, void *val)
         ht->pmem_used++;
         dictSetVal(d, entry, val);
 
-       kv_PM = pmemAddToPmemList((void *)copy, (void *)(((robj *)val)->ptr));
+        kv_PM = pmemAddToPmemList((void *)copy, (void *)(((robj *)val)->ptr));
         *kv_pm_reference = kv_PM;
         return 0;
     } else {
         auxentry = *entry;
         dictSetVal(d, entry, val);
-        pmemKVpairSet(entry->key, ((robj *)val)->ptr);
+        pmemKVpairSetRearrangeList(entry->key, ((robj *)val)->ptr);
         dictFreeVal(d, &auxentry);
         return 0;
     }

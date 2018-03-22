@@ -77,6 +77,7 @@ uint64_t pm_type_emb_sds_type_id;
 struct redis_pmem_root {
 	uint64_t num_dict_entries;
 	TOID(struct key_val_pair_PM) pe_first;
+    TOID(struct key_val_pair_PM) pe_last;
 };
 
 #endif
@@ -1752,6 +1753,8 @@ void securityWarningCommand(client *c);
 void aofSetCommand(client *c);
 void getPmemStatusCommand(client *c);
 void getDramStatusCommand(client *c);
+void getListPmemStatusCommand(client *c);
+void getReverseListPmemStatusCommand(client *c);
 #endif
 
 #if defined(__GNUC__)

@@ -1,6 +1,9 @@
 #include "server.h"
-#if defined(TODIS) && defined(PMDK)
+#ifdef TODIS
 #include "pmem.h"
+#include "obj.h"
+#include "libpmemobj.h"
+#include "util.h"
 #endif
 #include <math.h> /* isnan(), isinf() */
 
@@ -142,7 +145,7 @@ void getPmemStatusCommand(client *c) {
         sds key = dictGetKey(de);
         robj *keyobj;
 
-        keyobj = createStringObject(key, sdslen(key));
+        keyobj = createStringObject(sdsdup(key), sdslen(key));
         if (expireIfNeeded(c->db, keyobj) == 0) {
             addReplyBulk(c, keyobj);
             numreplies++;
@@ -180,7 +183,7 @@ void getDramStatusCommand(client *c) {
         sds key = dictGetKey(de);
         robj *keyobj;
 
-        keyobj = createStringObject(key, sdslen(key));
+        keyobj = createStringObject(sdsdup(key), sdslen(key));
         if (expireIfNeeded(c->db, keyobj) == 0) {
             addReplyBulk(c, keyobj);
             numreplies++;
@@ -191,6 +194,64 @@ void getDramStatusCommand(client *c) {
     }
 
     dictReleaseIterator(di);
+    setDeferredMultiBulkLength(c, replylen, numreplies);
+}
+
+void getListPmemStatusCommand(client *c) {
+    void *replylen = addDeferredMultiBulkLength(c);
+    unsigned long numreplies = 0;
+    char str_buf[1024];
+    TOID(struct redis_pmem_root) root;
+    TOID(struct key_val_pair_PM) kv_PM_oid;
+    struct key_val_pair_PM *kv_PM;
+    void *key;
+    void *val;
+    void *pmem_base_addr;
+
+    root = server.pm_rootoid;
+    pmem_base_addr = (void *)server.pm_pool->addr;
+    for (kv_PM_oid = D_RO(root)->pe_first;
+        TOID_IS_NULL(kv_PM_oid) == 0;
+        kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_next
+    ) {
+        kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
+        key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
+        val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
+
+        sprintf(str_buf, "key: %s, val: %s", key, val);
+        addReplyBulkCString(c, str_buf);
+        numreplies++;
+    }
+
+    setDeferredMultiBulkLength(c, replylen, numreplies);
+}
+
+void getReverseListPmemStatusCommand(client *c) {
+    void *replylen = addDeferredMultiBulkLength(c);
+    unsigned long numreplies = 0;
+    char str_buf[1024];
+    TOID(struct redis_pmem_root) root;
+    TOID(struct key_val_pair_PM) kv_PM_oid;
+    struct key_val_pair_PM *kv_PM;
+    void *key;
+    void *val;
+    void *pmem_base_addr;
+
+    root = server.pm_rootoid;
+    pmem_base_addr = (void *)server.pm_pool->addr;
+    for (kv_PM_oid = D_RO(root)->pe_last;
+        TOID_IS_NULL(kv_PM_oid) == 0;
+        kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_prev
+    ) {
+        kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
+        key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
+        val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
+
+        sprintf(str_buf, "key: %s, val: %s", key, val);
+        addReplyBulkCString(c, str_buf);
+        numreplies++;
+    }
+
     setDeferredMultiBulkLength(c, replylen, numreplies);
 }
 #endif
