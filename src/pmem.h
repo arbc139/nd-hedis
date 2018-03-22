@@ -30,6 +30,8 @@
 #ifndef __PMEM_H
 #define __PMEM_H
 
+#include "sds.h"
+
 #ifdef USE_PMDK
 typedef struct key_val_pair_PM {
     PMEMoid key_oid;
@@ -44,6 +46,7 @@ PMEMoid pmemAddToPmemList(void *key, void *val);
 void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
 #ifdef TODIS
 void pmemKVpairSetRearrangeList(void *key, void *val);
+sds getBestEvictionKeyPM(void);
 size_t pmem_used_memory(void);
 #endif
 #endif

@@ -125,6 +125,7 @@ void getPmemStatusCommand(client *c) {
     long long used_pmem_memory = (long long) pmem_used_memory();
     void *replylen = addDeferredMultiBulkLength(c);
     unsigned long numreplies = 0;
+    char str_buf[1024];
 
     dictIterator *di;
     dictEntry *de;
@@ -144,12 +145,12 @@ void getPmemStatusCommand(client *c) {
         if (de->location == LOCATION_DRAM) continue;
         sds key = dictGetKey(de);
         robj *keyobj;
+        robj *valobj = dictGetVal(de);
 
         keyobj = createStringObject(sdsdup(key), sdslen(key));
         if (expireIfNeeded(c->db, keyobj) == 0) {
-            addReplyBulk(c, keyobj);
-            numreplies++;
-            addReplyBulk(c, dictGetVal(de));
+            sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) valobj->ptr);
+            addReplyBulkCString(c, str_buf);
             numreplies++;
         }
         decrRefCount(keyobj);
@@ -163,6 +164,7 @@ void getDramStatusCommand(client *c) {
     long long used_dram_memory = (long long) zmalloc_used_memory();
     void *replylen = addDeferredMultiBulkLength(c);
     unsigned long numreplies = 0;
+    char str_buf[1024];
 
     dictIterator *di;
     dictEntry *de;
@@ -182,12 +184,12 @@ void getDramStatusCommand(client *c) {
         if (de->location == LOCATION_PMEM) continue;
         sds key = dictGetKey(de);
         robj *keyobj;
+        robj *valobj = dictGetVal(de);
 
         keyobj = createStringObject(sdsdup(key), sdslen(key));
         if (expireIfNeeded(c->db, keyobj) == 0) {
-            addReplyBulk(c, keyobj);
-            numreplies++;
-            addReplyBulk(c, dictGetVal(de));
+            sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) valobj->ptr);
+            addReplyBulkCString(c, str_buf);
             numreplies++;
         }
         decrRefCount(keyobj);
@@ -218,7 +220,7 @@ void getListPmemStatusCommand(client *c) {
         key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
         val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
 
-        sprintf(str_buf, "key: %s, val: %s", key, val);
+        sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
     }
@@ -247,7 +249,7 @@ void getReverseListPmemStatusCommand(client *c) {
         key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
         val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
 
-        sprintf(str_buf, "key: %s, val: %s", key, val);
+        sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
     }

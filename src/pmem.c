@@ -28,10 +28,12 @@
  */
 
 #ifdef USE_PMDK
+#include <stdlib.h>
 #include "server.h"
 #include "obj.h"
 #include "libpmemobj.h"
 #include "util.h"
+#include "sds.h"
 
 int
 pmemReconstruct(void)
@@ -241,6 +243,63 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
         serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
         return;
     }
+}
+#endif
+
+#ifdef TODIS
+key_val_pair_PM *getPmemKvObject(uint64_t i) {
+    TOID(struct redis_pmem_root) root;
+    TOID(struct key_val_pair_PM) kv_PM_oid;
+    void *pmem_base_addr;
+    struct redis_pmem_root *root_obj;
+    uint64_t count = 0;
+
+    root = server.pm_rootoid;
+    root_obj = pmemobj_direct(root.oid);
+    pmem_base_addr = (void *)server.pm_pool->addr;
+
+    if (i >= root_obj->num_dict_entries) return NULL;
+
+    for (kv_PM_oid = D_RO(root)->pe_first;
+        TOID_IS_NULL(kv_PM_oid) == 0;
+        kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_next
+    ) {
+        if (count < i) {
+            ++count;
+            continue;
+        }
+        return (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
+    }
+    return NULL;
+}
+#endif
+
+#ifdef TODIS
+sds getBestEvictionKeyPM(void) {
+    TOID(struct redis_pmem_root) root;
+    void *pmem_base_addr;
+    struct redis_pmem_root *root_obj;
+    uint64_t num_pmem_entries;
+
+    root = server.pm_rootoid;
+    root_obj = pmemobj_direct(root.oid);
+    num_pmem_entries = root_obj->num_dict_entries;
+    pmem_base_addr = (void *)server.pm_pool->addr;
+
+    /* allkeys-random policy */
+    if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
+        uint64_t index = random() % num_pmem_entries;
+        struct key_val_pair_PM *victim = getPmemKvObject(index);
+        if (victim == NULL) return NULL;
+        return (sds)(victim->key_oid.off + (uint64_t) pmem_base_addr);
+    }
+
+    /* allkeys-lru policy */
+    else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
+        // TODO(totoro): Needs to implement LRU algorithm...
+        return NULL;
+    }
+    return NULL;
 }
 #endif
 

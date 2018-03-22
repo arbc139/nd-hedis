@@ -577,13 +577,12 @@ void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
     argv[0] = createStringObject("AOFSET", 6);
     argv[1] = key;
     argv[2] = val;
-    incrRefCount(argv[0]);
     incrRefCount(argv[1]);
     incrRefCount(argv[2]);
 
-    serverLog(LL_TODIS, "TODIS, command: %s", argv[0]->ptr);
-    serverLog(LL_TODIS, "TODIS, key: %s", argv[1]->ptr);
-    serverLog(LL_TODIS, "TODIS, value: %s", argv[2]->ptr);
+    serverLog(LL_TODIS, "TODIS, command: %s", (char *) argv[0]->ptr);
+    serverLog(LL_TODIS, "TODIS, key: %s", (sds) argv[1]->ptr);
+    serverLog(LL_TODIS, "TODIS, value: %s", (sds) argv[2]->ptr);
 
     feedAppendOnlyFile(server.aofSetCommand, db->id, argv, 3);
 

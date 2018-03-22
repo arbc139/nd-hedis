@@ -3774,7 +3774,6 @@ int freeMemoryIfNeeded(void) {
             /* volatile-ttl */
             else if (server.maxmemory_policy == MAXMEMORY_VOLATILE_TTL) {
                 for (k = 0; k < server.maxmemory_samples; k++) {
-                    sds thiskey;
                     long thisval;
 
                     de = dictGetRandomKey(dict);
@@ -3842,6 +3841,103 @@ int freeMemoryIfNeeded(void) {
 
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void) {
+    size_t pmem_used, pmem_tofree, pmem_freed;
+
+    pmem_used = pmem_used_memory();
+
+    /* Check if we are over the persistent memory limit. */
+    if (pmem_used <= server.max_pmem_memory) return C_OK;
+
+    if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
+        return C_ERR; /* We need to free pmem memory, but policy forbids. */
+
+    /* Compute how much pmem memory we need to free. */
+    pmem_tofree = pmem_used - server.max_pmem_memory;
+    pmem_freed = 0;
+
+    serverLog(LL_TODIS, "##############################");
+    serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
+
+    while (pmem_freed < pmem_tofree) {
+        int j, k, keys_freed = 0;
+        dictEntry *victim_de;
+        redisDb *db;
+
+        sds victim_key = getBestEvictionKeyPM();
+        if (victim_key == NULL) return C_ERR;
+        for (j = 0; j < server.dbnum; j++) {
+            /* Find expired first. */
+            victim_de = dictFind(server.db[j].expires, victim_key);
+            if (victim_de != NULL) {
+                db = &server.db[j];
+                break;
+            }
+            victim_de = dictFind(server.db[j].dict, victim_key);
+            if (victim_de != NULL) {
+                db = &server.db[j];
+                break;
+            }
+        }
+
+        /* Finally remove the selected key. */
+        if (db != NULL && victim_de != NULL) {
+            long long delta;
+            serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", victim_de);
+
+            sds bestkey = dictGetKey(victim_de);
+            robj *bestval = (robj *) dictGetVal(victim_de);
+
+            serverLog(
+                    LL_TODIS,
+                    "TODIS, eviction bestkey: %s, bestval: %s",
+                    (sds) bestkey,
+                    (sds) bestval->ptr);
+
+            sds dramkey = sdsdup(bestkey);
+            robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
+
+            serverLog(
+                    LL_TODIS,
+                    "TODIS, eviction dramkey: %s, dramval: %s",
+                    (sds) dramkey,
+                    (sds) dramval->ptr);
+
+            robj *keyobj = createStringObject(sdsdup(bestkey), sdslen(bestkey));
+            /* Unlink PMEM dictEntry from DB. */
+            dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
+
+            /* Adds DRAM dictEntry to DB. */
+            robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
+            dbAdd(db, dramkeyobj, dramval);
+            /* Evicts to aof logs. */
+            feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
+            decrRefCount(dramkeyobj);
+
+            /* Remove PMEM dictEntry from pmem.
+             * We compute the amount of memory freed by dbDelete() alone.
+             * It is possible that actually the memory needed to propagte
+             * the DEL in AOF and replication link is greater than the one
+             * \we are freeing removing the key, but we can't account for
+             * that otherwise we would never exit the loop.
+             *
+             * AOF and Output buffer memory will be freed eventually so
+             * we only care about memory used by the key space. */
+            delta = (long long) server.used_pmem_memory;
+            dbFreeEntry(db, pmementry);
+            delta -= server.used_pmem_memory;
+            pmem_freed += delta;
+            decrRefCount(keyobj);
+            keys_freed++;
+        }
+        if (!keys_freed)
+            return C_ERR; /* nothing to free... */
+    }
+
+    serverLog(LL_TODIS, "##############################");
+    return C_OK;
+}
+
+int freePmemMemoryIfNeededBackup(void) {
     size_t pmem_used, pmem_tofree, pmem_freed;
 
     pmem_used = pmem_used_memory();
