@@ -46,6 +46,11 @@ PMEMoid pmemAddToPmemList(void *key, void *val);
 void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
 #ifdef TODIS
 void pmemKVpairSetRearrangeList(void *key, void *val);
+PMEMoid pmemUnlinkFromPmemList(PMEMoid oid);
+PMEMoid getBestEvictionKeyPMEMoid(void);
+struct key_val_pair_PM *getPMObjectFromOid(PMEMoid oid);
+sds getKeyFromPMObject(struct key_val_pair_PM *obj);
+sds getKeyFromOid(PMEMoid oid);
 sds getBestEvictionKeyPM(void);
 size_t pmem_used_memory(void);
 #endif

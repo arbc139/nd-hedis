@@ -78,6 +78,7 @@ struct redis_pmem_root {
 	uint64_t num_dict_entries;
 	TOID(struct key_val_pair_PM) pe_first;
     TOID(struct key_val_pair_PM) pe_last;
+    TOID(struct key_val_pair_PM) evict_first;
 };
 
 #endif

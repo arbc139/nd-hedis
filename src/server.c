@@ -3863,7 +3863,8 @@ int freePmemMemoryIfNeeded(void) {
         dictEntry *victim_de;
         redisDb *db;
 
-        sds victim_key = getBestEvictionKeyPM();
+        PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
+        sds victim_key = getKeyFromOid(victim_oid);
         if (victim_key == NULL) return C_ERR;
         for (j = 0; j < server.dbnum; j++) {
             /* Find expired first. */
@@ -3905,6 +3906,8 @@ int freePmemMemoryIfNeeded(void) {
             robj *keyobj = createStringObject(sdsdup(bestkey), sdslen(bestkey));
             /* Unlink PMEM dictEntry from DB. */
             dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
+            /* (TIER 2) Evict PMEM node from PMEM list. */
+            /*evictPmemNodeToTier2(bestkey);*/
 
             /* Adds DRAM dictEntry to DB. */
             robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
