@@ -269,6 +269,7 @@ sds sdsRemoveFreeSpace(sds s);
 size_t sdsAllocSize(sds s);
 #ifdef TODIS
 size_t sdsAllocSizePM(sds s);
+void sdsfreeVictim(sds s);
 #endif
 void *sdsAllocPtr(sds s);
 

@@ -445,7 +445,7 @@ void flushAppendOnlyFile(int force) {
         server.aof_last_fsync = server.unixtime;
     }
 #ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, flushAppendOnlyFile FINISHED");
+    serverLog(LL_TODIS, "TODIS, flushAppendOnlyFile FIRED");
 #endif
 }
 

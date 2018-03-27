@@ -277,6 +277,21 @@ void sdsfreePM(sds s) {
 }
 #endif
 
+#ifdef TODIS
+/* Free an sds string. No operation is performed if 's' is NULL. */
+void sdsfreeVictim(sds s) {
+    PMEMoid oid;
+    if (s == NULL) return;
+    if (server.persistent) {
+        oid.off = (uint64_t)((char*)s-sdsHdrSize(s[-1])) - sizeof(PMEMoid) - (uint64_t)server.pm_pool;
+        oid.pool_uuid_lo = server.pool_uuid_lo;
+        pmemobj_tx_free(oid);
+    } else {
+        s_free((char*)s-sdsHdrSize(s[-1]));
+    }
+}
+#endif
+
 /* Set the sds string length to the length as obtained with strlen(), so
  * considering as content only up to the first null term character.
  *

@@ -287,7 +287,6 @@ int dictRehash(dict *d, int n) {
                 d->ht[0].pmem_used--;
                 d->ht[1].pmem_used++;
             }
-                    
 #endif
             de = nextde;
         }
@@ -467,7 +466,7 @@ dictEntry *dictAddRawPM(dict *d, void *key)
     return entry;
 }
 
-dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
+void dictAddReconstructedPM(dict *d, void *key, void *val)
 {
     int index;
     dictEntry *entry;
@@ -478,8 +477,10 @@ dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
-    if ((index = _dictKeyIndex(d, (const void *)key)) == -1)
-        return NULL;
+    if ((index = _dictKeyIndex(d, (const void *)key)) == -1) {
+        dictReplaceTODIS(d, key, val);
+        return;
+    }
 
     /* Allocate the memory and store the new entry.
      * Insert the element in top, with the assumption that in a database
@@ -501,8 +502,6 @@ dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val)
 
     dictSetKey(d, entry, key);
     dictSetVal(d, entry, val_robj);
-
-    return entry;
 }
 #endif
 

@@ -302,6 +302,7 @@ struct redisCommand redisCommandTable[] = {
     {"dramstatus",getDramStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"lpmemstatus",getListPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"rlpmemstatus",getReverseListPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
+    {"lvictimstatus",getListVictimStatusCommand,1,"r",0,NULL,0,0,0,0,0},
 #endif
     {"latency",latencyCommand,-2,"aslt",0,NULL,0,0,0,0,0}
 };
@@ -3906,8 +3907,21 @@ int freePmemMemoryIfNeeded(void) {
             robj *keyobj = createStringObject(sdsdup(bestkey), sdslen(bestkey));
             /* Unlink PMEM dictEntry from DB. */
             dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
-            /* (TIER 2) Evict PMEM node from PMEM list. */
-            /*evictPmemNodeToTier2(bestkey);*/
+            /* (TIER 2) Evict PMEM node from PMEM list to Victim list. */
+            TX_BEGIN(server.pm_pool) {
+                evictPmemNodeToVictimList(victim_oid);
+            } TX_ONABORT {
+                serverLog(
+                        LL_TODIS,
+                        "TODIS_ERROR: evict pmem node to victim list failed (%s)",
+                        __func__);
+            } TX_END
+            /* Free pmem dictEntry
+             * This is not free key and val.
+             * Just free a pmem dictEntry itself. */
+            zfree(pmementry);
+            decrRefCount(keyobj);
+            server.used_pmem_memory -= sizeOfPmemNode(victim_oid);
 
             /* Adds DRAM dictEntry to DB. */
             robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
@@ -3916,20 +3930,8 @@ int freePmemMemoryIfNeeded(void) {
             feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
             decrRefCount(dramkeyobj);
 
-            /* Remove PMEM dictEntry from pmem.
-             * We compute the amount of memory freed by dbDelete() alone.
-             * It is possible that actually the memory needed to propagte
-             * the DEL in AOF and replication link is greater than the one
-             * \we are freeing removing the key, but we can't account for
-             * that otherwise we would never exit the loop.
-             *
-             * AOF and Output buffer memory will be freed eventually so
-             * we only care about memory used by the key space. */
-            delta = (long long) server.used_pmem_memory;
-            dbFreeEntry(db, pmementry);
-            delta -= server.used_pmem_memory;
-            pmem_freed += delta;
-            decrRefCount(keyobj);
+            /* Adds freed memory proportion. */
+            pmem_freed += sizeOfPmemNode(victim_oid);
             keys_freed++;
         }
         if (!keys_freed)
@@ -4456,6 +4458,7 @@ void initPersistentMemory(void) {
         server.pm_rootoid = POBJ_ROOT(server.pm_pool, struct redis_pmem_root);
         root = pmemobj_direct(server.pm_rootoid.oid);
         root->num_dict_entries = 0;
+        root->num_victim_entries = 0;
     }
 
     /* Get pool UUID from root object's OID. */
@@ -4630,7 +4633,11 @@ int main(int argc, char **argv) {
 #ifdef USE_PMDK
         if (server.pm_reconstruct_required) {
             long long start = ustime();
+#ifndef TODIS
             if (pmemReconstruct() == C_OK) {
+#else
+            if (pmemReconstructTODIS() == C_OK) {
+#endif
                 serverLog(LL_NOTICE,"DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
 #ifdef TODIS
                 serverLog(LL_TODIS,"TODIS, DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);

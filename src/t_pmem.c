@@ -256,4 +256,33 @@ void getReverseListPmemStatusCommand(client *c) {
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
 }
+
+void getListVictimStatusCommand(client *c) {
+    void *replylen = addDeferredMultiBulkLength(c);
+    unsigned long numreplies = 0;
+    char str_buf[1024];
+    TOID(struct redis_pmem_root) root;
+    TOID(struct key_val_pair_PM) victim_toid;
+    struct key_val_pair_PM *victim_obj;
+    void *key;
+    void *val;
+    void *pmem_base_addr;
+
+    root = server.pm_rootoid;
+    pmem_base_addr = (void *)server.pm_pool->addr;
+    for (victim_toid = D_RO(root)->victim_first;
+        TOID_IS_NULL(victim_toid) == 0;
+        victim_toid = D_RO(victim_toid)->pmem_list_next
+    ) {
+        victim_obj = (key_val_pair_PM *)(victim_toid.oid.off + (uint64_t) pmem_base_addr);
+        key = (void *)(victim_obj->key_oid.off + (uint64_t) pmem_base_addr);
+        val = (void *)(victim_obj->val_oid.off + (uint64_t) pmem_base_addr);
+
+        sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
+        addReplyBulkCString(c, str_buf);
+        numreplies++;
+    }
+
+    setDeferredMultiBulkLength(c, replylen, numreplies);
+}
 #endif

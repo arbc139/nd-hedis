@@ -78,7 +78,8 @@ struct redis_pmem_root {
 	uint64_t num_dict_entries;
 	TOID(struct key_val_pair_PM) pe_first;
     TOID(struct key_val_pair_PM) pe_last;
-    TOID(struct key_val_pair_PM) evict_first;
+    uint64_t num_victim_entries;
+    TOID(struct key_val_pair_PM) victim_first;
 };
 
 #endif
@@ -1756,6 +1757,7 @@ void getPmemStatusCommand(client *c);
 void getDramStatusCommand(client *c);
 void getListPmemStatusCommand(client *c);
 void getReverseListPmemStatusCommand(client *c);
+void getListVictimStatusCommand(client *c);
 #endif
 
 #if defined(__GNUC__)

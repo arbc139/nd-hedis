@@ -202,7 +202,7 @@ unsigned long dictScan(dict *d, unsigned long v, dictScanFunction *fn, void *pri
 /* PMEM-specific API */
 int dictAddPM(dict *d, void *key, void *val);
 dictEntry *dictAddRawPM(dict *d, void *key);
-dictEntry *dictAddReconstructedPM(dict *d, void *key, void *val);
+void dictAddReconstructedPM(dict *d, void *key, void *val);
 int dictReplacePM(dict *d, void *key, void *val);
 #endif
 #ifdef TODIS
