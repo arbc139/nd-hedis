@@ -333,6 +333,15 @@ void loadServerConfigFromString(char *config) {
                 goto loaderr;
             }
 #endif
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0], "pmem-victim-count") && argc == 2) {
+            long long pmem_victim_count = atoi(argv[1]);
+            if (pmem_victim_count < CONFIG_MIN_PMEM_VICTIM_COUNT) {
+                err = "Invalid pmem victim count";
+                goto loaderr;
+            }
+            server.pmem_victim_count = pmem_victim_count;
+#endif
         } else if (!strcasecmp(argv[0],"maxmemory-samples") && argc == 2) {
             server.maxmemory_samples = atoi(argv[1]);
             if (server.maxmemory_samples <= 0) {

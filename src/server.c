@@ -1585,6 +1585,7 @@ void initServerConfig(void) {
     server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
     server.max_pmem_memory_policy = CONFIG_DEFAULT_MAXMEMORY_POLICY;
+    server.pmem_victim_count = CONFIG_MIN_PMEM_VICTIM_COUNT;
     server.todis_log_only = CONFIG_DEFAULT_TODIS_LOG_ONLY;
 #endif
     server.supervised = 0;

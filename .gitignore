@@ -30,3 +30,4 @@ deps/lua/src/liblua.a
 .vscode/
 **/tags
 *.aof
+.*.swo
