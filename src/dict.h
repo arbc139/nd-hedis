@@ -206,6 +206,7 @@ void dictAddReconstructedPM(dict *d, void *key, void *val);
 int dictReplacePM(dict *d, void *key, void *val);
 #endif
 #ifdef TODIS
+int dictAddReconstructedVictim(dict *d, void *key, void *val);
 int dictReplaceTODIS(dict *d, void *key, void *val);
 #endif
 

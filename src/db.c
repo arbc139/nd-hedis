@@ -38,7 +38,6 @@
 #include "libpmemobj.h"
 #endif
 
-
 extern struct redisServer server; /* server global state */
 
 void slotToKeyAdd(robj *key);
@@ -168,6 +167,22 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
 #ifdef TODIS
 dictEntry *lookupKeyEntry(redisDb *db, robj *key) {
     return dictFind(db->dict, key->ptr);
+}
+#endif
+
+#ifdef TODIS
+int dbReconstructVictim(redisDb *db, robj *key, robj *val) {
+    serverLog(LL_TODIS, "TODIS, dbReconstructVictim START");
+    dictEntry *de = lookupKeyEntry(db, key);
+    if (de == NULL) {
+        feedAppendOnlyFileTODIS(db, key, val);
+    } else if (de->location == LOCATION_DRAM) {
+        decrRefCount(key);
+        decrRefCount(val);
+        return C_ERR;
+    }
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedVictim END");
+    return C_OK;
 }
 #endif
 

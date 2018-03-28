@@ -468,6 +468,9 @@ dictEntry *dictAddRawPM(dict *d, void *key)
 
 void dictAddReconstructedPM(dict *d, void *key, void *val)
 {
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM START");
+#endif
     int index;
     dictEntry *entry;
     robj *val_robj;
@@ -478,7 +481,14 @@ void dictAddReconstructedPM(dict *d, void *key, void *val)
     /* Get the index of the new element, or -1 if
      * the element already exists. */
     if ((index = _dictKeyIndex(d, (const void *)key)) == -1) {
+#ifdef TODIS
+        serverLog(
+                LL_TODIS,
+                "TODIS, dictAddReconstructedPM key duplicated: %s",
+                key);
         dictReplaceTODIS(d, key, val);
+        serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM duplicated replaced");
+#endif
         return;
     }
 
@@ -579,6 +589,7 @@ int dictReplaceTODIS(dict *d, void *key, void *val)
      * you want to increment (set), and then decrement (free), and not the
      * reverse. */
     if (entry->location == LOCATION_DRAM) {
+        serverLog(LL_TODIS, "TODIS, dictReplaceTODIS location dram");
         PMEMoid kv_PM;
         PMEMoid *kv_pm_reference;
 
@@ -590,6 +601,7 @@ int dictReplaceTODIS(dict *d, void *key, void *val)
         dictht *ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
         ht->pmem_used++;
         dictSetVal(d, entry, val);
+        serverLog(LL_TODIS, "TODIS, dictReplaceTODIS set pmem location completed");
 
         kv_PM = pmemAddToPmemList((void *)copy, (void *)(((robj *)val)->ptr));
         *kv_pm_reference = kv_PM;

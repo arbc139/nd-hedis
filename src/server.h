@@ -1352,6 +1352,11 @@ void stopLoading(void);
 /* AOF persistence */
 void flushAppendOnlyFile(int force);
 void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int argc);
+#ifdef TODIS
+void aofFsyncWithFlushVictim(int fd);
+void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val);
+void forceFlushAppendOnlyFileTODIS();
+#endif
 void aofRemoveTempFile(pid_t childpid);
 int rewriteAppendOnlyFileBackground(void);
 int loadAppendOnlyFile(char *filename);
@@ -1493,6 +1498,7 @@ int rewriteConfig(char *path);
 int removeExpire(redisDb *db, robj *key);
 void propagateExpire(redisDb *db, robj *key);
 #ifdef TODIS
+int dbReconstructVictim(redisDb *db, robj *key, robj *val);
 void propagateExpireTODIS(redisDb *db, dictEntry *entry);
 #endif
 int expireIfNeeded(redisDb *db, robj *key);

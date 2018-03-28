@@ -2729,7 +2729,11 @@ int prepareForShutdown(int flags) {
         }
         /* Append only file: fsync() the AOF and exit */
         serverLog(LL_NOTICE,"Calling fsync() on the AOF file.");
+#ifdef TODIS
+        aofFsyncWithFlushVictim(server.aof_fd);
+#else
         aof_fsync(server.aof_fd);
+#endif
     }
 
     /* Create a new RDB file before exiting. */
@@ -4633,11 +4637,20 @@ int main(int argc, char **argv) {
 #ifdef USE_PMDK
         if (server.pm_reconstruct_required) {
             long long start = ustime();
+            int reconstruct_result;
 #ifndef TODIS
-            if (pmemReconstruct() == C_OK) {
+            reconstruct_result = pmemReconstruct();
 #else
-            if (pmemReconstructTODIS() == C_OK) {
+            TX_BEGIN(server.pm_pool) {
+                reconstruct_result = pmemReconstructTODIS();
+            } TX_ONABORT {
+                serverLog(
+                        LL_TODIS,
+                        "TODIS_ERROR, pmem reconstruct failed (%s)",
+                        __func__);
+            } TX_END
 #endif
+            if (reconstruct_result == C_OK) {
                 serverLog(LL_NOTICE,"DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
 #ifdef TODIS
                 serverLog(LL_TODIS,"TODIS, DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);

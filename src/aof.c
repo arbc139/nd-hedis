@@ -40,6 +40,10 @@
 #include <sys/wait.h>
 #include <sys/param.h>
 
+#ifdef TODIS
+#include "pmem.h"
+#endif
+
 void aofUpdateCurrentSize(void);
 void aofClosePipes(void);
 
@@ -202,12 +206,27 @@ void aof_background_fsync(int fd) {
     bioCreateBackgroundJob(BIO_AOF_FSYNC,(void*)(long)fd,NULL,NULL);
 }
 
+#ifdef TODIS
+void aofFsyncWithFlushVictim(int fd) {
+    aof_fsync(fd);
+    TX_BEGIN(server.pm_pool) {
+        freeVictimList();
+    } TX_ONABORT {
+        serverLog(LL_TODIS, "TODIS_ERROR, free victim list failed: (%s)", __func__);
+    } TX_END
+}
+#endif
+
 /* Called when the user switches from "appendonly yes" to "appendonly no"
  * at runtime using the CONFIG command. */
 void stopAppendOnly(void) {
     serverAssert(server.aof_state != AOF_OFF);
     flushAppendOnlyFile(1);
+#ifdef TODIS
+    aofFsyncWithFlushVictim(server.aof_fd);
+#else
     aof_fsync(server.aof_fd);
+#endif
     close(server.aof_fd);
 
     server.aof_fd = -1;
@@ -435,7 +454,11 @@ void flushAppendOnlyFile(int force) {
         /* aof_fsync is defined as fdatasync() for Linux in order to avoid
          * flushing metadata. */
         latencyStartMonitor(latency);
+#ifdef TODIS
+        aofFsyncWithFlushVictim(server.aof_fd);
+#else
         aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
+#endif
         latencyEndMonitor(latency);
         latencyAddSampleIfNeeded("aof-fsync-always",latency);
         server.aof_last_fsync = server.unixtime;
@@ -448,6 +471,19 @@ void flushAppendOnlyFile(int force) {
     serverLog(LL_TODIS, "TODIS, flushAppendOnlyFile FIRED");
 #endif
 }
+
+#ifdef TODIS
+void forceFlushAppendOnlyFileTODIS(void) {
+    if (server.aof_fsync == AOF_FSYNC_ALWAYS) {
+        /* Let's try to get this data on the disk */
+        aofFsyncWithFlushVictim(server.aof_fd);
+        server.aof_last_fsync = server.unixtime;
+    } else if (server.aof_fsync == AOF_FSYNC_EVERYSEC) {
+        aof_background_fsync(server.aof_fd);
+        server.aof_last_fsync = server.unixtime;
+    }
+}
+#endif
 
 sds catAppendOnlyGenericCommand(sds dst, int argc, robj **argv) {
     char buf[32];
@@ -1494,7 +1530,11 @@ void backgroundRewriteDoneHandler(int exitcode, int bysignal) {
             oldfd = server.aof_fd;
             server.aof_fd = newfd;
             if (server.aof_fsync == AOF_FSYNC_ALWAYS)
+#ifdef TODIS
+                aofFsyncWithFlushVictim(newfd);
+#else
                 aof_fsync(newfd);
+#endif
             else if (server.aof_fsync == AOF_FSYNC_EVERYSEC)
                 aof_background_fsync(newfd);
             server.aof_selected_db = -1; /* Make sure SELECT is re-issued */
