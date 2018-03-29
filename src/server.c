@@ -298,6 +298,7 @@ struct redisCommand redisCommandTable[] = {
     {"host:",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
 #ifdef TODIS
     {"aofset",aofSetCommand,-3,"wm",0,NULL,1,1,1,0,0},
+    {"pmprocesstime",getPmemProcessTimeCommand,1,"r",0,NULL,0,0,0,0,0},
     {"pmemstatus",getPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"dramstatus",getDramStatusCommand,1,"r",0,NULL,0,0,0,0,0},
     {"lpmemstatus",getListPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
@@ -2483,6 +2484,7 @@ void call(client *c, int flags) {
  * other operations can be performed by the caller. Otherwise
  * if C_ERR is returned the client was destroyed (i.e. after QUIT). */
 int processCommand(client *c) {
+    long long start_time = ustime();
     /* The QUIT command is handled separately. Normal command procs will
      * go through checking for replication and QUIT will cause trouble
      * when FORCE_REPLICATION is enabled and would be implemented in
@@ -2565,7 +2567,10 @@ int processCommand(client *c) {
 
 #ifdef TODIS
     if (server.max_pmem_memory) {
+        long long start_time_evict = ustime();
         freePmemMemoryIfNeeded();
+        long long end_time_evict = ustime();
+        server.pmem_list_time += end_time_evict - start_time_evict;
     }
 #endif
 
@@ -2675,6 +2680,8 @@ int processCommand(client *c) {
 #ifdef TODIS
     writeStatusLogs();
 #endif
+    long long end_time = ustime();
+    server.process_time += end_time - start_time;
 
     return C_OK;
 }
@@ -3869,6 +3876,8 @@ int freePmemMemoryIfNeeded(void) {
         dictEntry *victim_de;
         redisDb *db;
 
+        /* Find a victim key. */
+        long long free_pmem_time_find_victim_key_start = ustime();
         PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
         sds victim_key = getKeyFromOid(victim_oid);
         if (victim_key == NULL) return C_ERR;
@@ -3885,12 +3894,15 @@ int freePmemMemoryIfNeeded(void) {
                 break;
             }
         }
+        long long free_pmem_time_find_victim_key_end = ustime();
+        server.free_pmem_time_find_victim_key += free_pmem_time_find_victim_key_end - free_pmem_time_find_victim_key_start;
 
         /* Finally remove the selected key. */
         if (db != NULL && victim_de != NULL) {
             long long delta;
             serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", victim_de);
 
+            long long free_pmem_time_make_dram_key_val_start = ustime();
             sds bestkey = dictGetKey(victim_de);
             robj *bestval = (robj *) dictGetVal(victim_de);
 
@@ -3910,8 +3922,16 @@ int freePmemMemoryIfNeeded(void) {
                     (sds) dramval->ptr);
 
             robj *keyobj = createStringObject(sdsdup(bestkey), sdslen(bestkey));
+            long long free_pmem_time_make_dram_key_val_end = ustime();
+            server.free_pmem_time_make_dram_key_val += free_pmem_time_make_dram_key_val_end - free_pmem_time_make_dram_key_val_start;
+
+            long long free_pmem_time_dict_unlink_start = ustime();
             /* Unlink PMEM dictEntry from DB. */
             dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
+            long long free_pmem_time_dict_unlink_end = ustime();
+            server.free_pmem_time_dict_unlink += free_pmem_time_dict_unlink_end - free_pmem_time_dict_unlink_start;
+
+            long long free_pmem_time_pmem_eviction_start = ustime();
             /* (TIER 2) Evict PMEM node from PMEM list to Victim list. */
             TX_BEGIN(server.pm_pool) {
                 evictPmemNodeToVictimList(victim_oid);
@@ -3921,19 +3941,32 @@ int freePmemMemoryIfNeeded(void) {
                         "TODIS_ERROR: evict pmem node to victim list failed (%s)",
                         __func__);
             } TX_END
+            long long free_pmem_time_pmem_eviction_end = ustime();
+            server.free_pmem_time_pmem_eviction += free_pmem_time_pmem_eviction_end - free_pmem_time_pmem_eviction_start;
+
+            long long free_pmem_time_pmem_entry_free_start = ustime();
             /* Free pmem dictEntry
              * This is not free key and val.
              * Just free a pmem dictEntry itself. */
             zfree(pmementry);
             decrRefCount(keyobj);
             server.used_pmem_memory -= sizeOfPmemNode(victim_oid);
+            long long free_pmem_time_pmem_entry_free_end = ustime();
+            server.free_pmem_time_pmem_entry_free += free_pmem_time_pmem_entry_free_end - free_pmem_time_pmem_entry_free_start;
 
+            long long free_pmem_time_add_dram_entry_start = ustime();
             /* Adds DRAM dictEntry to DB. */
             robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
             dbAdd(db, dramkeyobj, dramval);
+            long long free_pmem_time_add_dram_entry_end = ustime();
+            server.free_pmem_time_add_dram_entry += free_pmem_time_add_dram_entry_end - free_pmem_time_add_dram_entry_start;
+
+            long long free_pmem_time_feed_dram_log_start = ustime();
             /* Evicts to aof logs. */
             feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
             decrRefCount(dramkeyobj);
+            long long free_pmem_time_feed_dram_log_end = ustime();
+            server.free_pmem_time_feed_dram_log += free_pmem_time_feed_dram_log_end - free_pmem_time_feed_dram_log_start;
 
             /* Adds freed memory proportion. */
             pmem_freed += sizeOfPmemNode(victim_oid);

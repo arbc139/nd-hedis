@@ -209,8 +209,7 @@ pmemAddToPmemList(void *key, void *val)
 }
 
 void
-pmemRemoveFromPmemList(PMEMoid oid)
-{
+pmemRemoveFromPmemList(PMEMoid oid) {
 #ifdef TODIS
     serverLog(LL_TODIS, "   ");
     serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList START");
@@ -236,9 +235,6 @@ pmemRemoveFromPmemList(PMEMoid oid)
         TX_ADD_DIRECT(root);
         root->pe_first = TOID_NULL(struct key_val_pair_PM);
         root->pe_last = TOID_NULL(struct key_val_pair_PM);
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
-        return;
     }
     else if(TOID_EQUALS(root->pe_first, pmem_toid)) {
         TOID(struct key_val_pair_PM) pmem_toid_next = D_RO(pmem_toid)->pmem_list_next;
@@ -250,9 +246,6 @@ pmemRemoveFromPmemList(PMEMoid oid)
         TX_FREE(root->pe_first);
         TX_ADD_DIRECT(root);
         root->pe_first = pmem_toid_next;
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
-        return;
     }
     else if (TOID_EQUALS(root->pe_last, pmem_toid)) {
         TOID(struct key_val_pair_PM) pmem_toid_prev = D_RO(pmem_toid)->pmem_list_prev;
@@ -264,29 +257,25 @@ pmemRemoveFromPmemList(PMEMoid oid)
         TX_FREE(root->pe_last);
         TX_ADD_DIRECT(root);
         root->pe_last = pmem_toid_prev;
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
-        return;
     }
     else {
         TOID(struct key_val_pair_PM) pmem_toid_prev = D_RO(pmem_toid)->pmem_list_prev;
         TOID(struct key_val_pair_PM) pmem_toid_next = D_RO(pmem_toid)->pmem_list_next;
         if(!TOID_IS_NULL(pmem_toid_prev)){
             struct key_val_pair_PM *prev = D_RW(pmem_toid_prev);
-            TX_ADD_FIELD_DIRECT(prev,pmem_list_next);
+            TX_ADD_FIELD_DIRECT(prev, pmem_list_next);
             prev->pmem_list_next = pmem_toid_next;
         }
         if(!TOID_IS_NULL(pmem_toid_next)){
             struct key_val_pair_PM *next = D_RW(pmem_toid_next);
-            TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
+            TX_ADD_FIELD_DIRECT(next, pmem_list_prev);
             next->pmem_list_prev = pmem_toid_prev;
         }
         TX_FREE(pmem_toid);
-        TX_ADD_FIELD_DIRECT(root,num_dict_entries);
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList END");
-        return;
     }
+    TX_ADD_FIELD_DIRECT(root,num_dict_entries);
+    root->num_dict_entries--;
+    serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
 }
 #endif
 
@@ -305,9 +294,6 @@ PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
         TX_ADD_DIRECT(root);
         root->pe_first = TOID_NULL(struct key_val_pair_PM);
         root->pe_last = TOID_NULL(struct key_val_pair_PM);
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
-        return oid;
     }
     else if(TOID_EQUALS(root->pe_first, pmem_toid)) {
         TOID(struct key_val_pair_PM) pmem_toid_next = D_RO(pmem_toid)->pmem_list_next;
@@ -318,9 +304,6 @@ PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
         }
         TX_ADD_DIRECT(root);
         root->pe_first = pmem_toid_next;
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
-        return oid;
     }
     else if (TOID_EQUALS(root->pe_last, pmem_toid)) {
         TOID(struct key_val_pair_PM) pmem_toid_prev = D_RO(pmem_toid)->pmem_list_prev;
@@ -331,9 +314,6 @@ PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
         }
         TX_ADD_DIRECT(root);
         root->pe_last = pmem_toid_prev;
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
-        return oid;
     }
     else {
         TOID(struct key_val_pair_PM) pmem_toid_prev = D_RO(pmem_toid)->pmem_list_prev;
@@ -348,11 +328,12 @@ PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
             TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
             next->pmem_list_prev = pmem_toid_prev;
         }
-        TX_ADD_FIELD_DIRECT(root,num_dict_entries);
-        root->num_dict_entries--;
-        serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
-        return oid;
     }
+    TX_ADD_FIELD_DIRECT(root,num_dict_entries);
+    root->num_dict_entries--;
+    serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
+    return oid;
+
 }
 #endif
 
@@ -534,7 +515,6 @@ void freeVictim(PMEMoid oid) {
 void freeVictimList() {
     serverLog(LL_TODIS, "   ");
     serverLog(LL_TODIS, "TODIS, freeVictimList START");
-    TOID(struct key_val_pair_PM) victim_toid;
     struct redis_pmem_root *root;
 
     root = pmemobj_direct(server.pm_rootoid.oid);
@@ -548,7 +528,6 @@ void freeVictimList() {
         root->num_victim_entries--;
         root->victim_first = next_toid;
     }
-    TX_ADD_DIRECT(root);
     serverLog(LL_TODIS, "TODIS, freeVictimList END");
 }
 #endif

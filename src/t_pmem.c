@@ -121,6 +121,59 @@ void aofSetCommand(client *c) {
  * Check PMEM / DRAM status command
  *----------------------------------------------------------------------------*/
 #ifdef TODIS
+void getPmemProcessTimeCommand(client *c) {
+    void *replylen = addDeferredMultiBulkLength(c);
+    unsigned long numreplies = 0;
+
+    addReplyBulkCString(c, "pmem used time for list process:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.pmem_list_time);
+    numreplies++;
+
+    addReplyBulkCString(c, "total process used time:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.process_time);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 1) Find victim key:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_find_victim_key);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 2) Make dram key val:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_make_dram_key_val);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 3) Dict unlink:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_dict_unlink);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 4) Pmem eviction:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_pmem_eviction);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 5) Pmem entry free:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_pmem_entry_free);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 6) Add dram entry:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_add_dram_entry);
+    numreplies++;
+
+    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 7) Feed dram log:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.free_pmem_time_feed_dram_log);
+    numreplies++;
+
+    setDeferredMultiBulkLength(c, replylen, numreplies);
+}
+#endif
+#ifdef TODIS
 void getPmemStatusCommand(client *c) {
     long long used_pmem_memory = (long long) pmem_used_memory();
     void *replylen = addDeferredMultiBulkLength(c);

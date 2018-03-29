@@ -870,6 +870,15 @@ struct redisServer {
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
 #endif
 #ifdef TODIS
+    long long process_time;         /* TEMP: time checking for process command */
+    long long pmem_list_time;       /* TEMP: time checking for pmem list */
+    long long free_pmem_time_find_victim_key;
+    long long free_pmem_time_make_dram_key_val;
+    long long free_pmem_time_dict_unlink;
+    long long free_pmem_time_pmem_eviction;
+    long long free_pmem_time_pmem_entry_free;
+    long long free_pmem_time_add_dram_entry;
+    long long free_pmem_time_feed_dram_log;
     size_t used_pmem_memory;        /* Used memory capacity in pmem */
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
     int max_pmem_memory_policy;     /* Policy for key eviction */
@@ -1761,6 +1770,7 @@ void latencyCommand(client *c);
 void securityWarningCommand(client *c);
 #ifdef TODIS
 void aofSetCommand(client *c);
+void getPmemProcessTimeCommand(client *c);
 void getPmemStatusCommand(client *c);
 void getDramStatusCommand(client *c);
 void getListPmemStatusCommand(client *c);
