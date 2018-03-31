@@ -97,7 +97,7 @@ int pmemReconstructTODIS(void) {
 
     /* Reconstruct pmem lists */
     for (pmem_toid = D_RO(root)->pe_first;
-        TOID_IS_NULL(pmem_toid) == 0;
+        ;
         pmem_toid = D_RO(pmem_toid)->pmem_list_next
     ) {
 		pmem_obj = (key_val_pair_PM *)(pmem_toid.oid.off + (uint64_t)pmem_base_addr);
@@ -113,6 +113,9 @@ int pmemReconstructTODIS(void) {
                 server.used_pmem_memory);
 
         dictAddReconstructedPM(d, key, val);
+        if (TOID_EQUALS(pmem_toid, D_RO(root)->pe_last)) {
+            break;
+        }
     }
 
     serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
@@ -364,6 +367,71 @@ PMEMoid getPmemKvOid(uint64_t i) {
 #endif
 
 #ifdef TODIS
+void knuthUniqNumberGenerator(int *numbers, const int size, const int range) {
+    int size_iter = 0;
+
+    for (
+        int range_iter = 0;
+        range_iter < range && size_iter < size;
+        ++range_iter
+    ) {
+        int random_range = range - range_iter;
+        int random_size = size - size_iter;
+        if (random() % random_range < random_size)
+            numbers[size_iter++] = range_iter;
+    }
+}
+#endif
+
+#ifdef TODIS
+/**
+ * Getting best eviction PMEMoid function.
+ * parameters
+ * - victim_oids: Victim PMEMoids that filled by this function.
+ */
+int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
+    TOID(struct redis_pmem_root) root;
+    struct redis_pmem_root *root_obj;
+    uint64_t num_pmem_entries;
+
+    root = server.pm_rootoid;
+    root_obj = pmemobj_direct(root.oid);
+    num_pmem_entries = root_obj->num_dict_entries;
+
+    if (server.pmem_victim_count > num_pmem_entries) {
+        serverLog(
+                LL_TODIS,
+                "TODIS_ERROR, Number of victim count is larger than pmem entries!");
+        return C_ERR;
+    }
+
+    /* allkeys-random policy */
+    if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
+        // TODO(totoro): Implements bulk victim algorithm for RANDOM policy...
+        /*int *indexes = zmalloc(sizeof(int) * server.pmem_victim_count);*/
+        /*knuthUniqNumberGenerator(*/
+                /*indexes, server.pmem_victim_count, num_pmem_entries);*/
+        /*for (size_t i = 0; i < server.pmem_victim_count; ++i) {*/
+            /*victim_oids[i] = getPmemKvOid(indexes[i]);*/
+        /*}*/
+        /*zfree(indexes);*/
+        return C_ERR;
+    }
+
+    /* allkeys-lru policy */
+    else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
+        TOID(struct key_val_pair_PM) victim_toid = root_obj->pe_last;
+        for (int i = server.pmem_victim_count - 1; i >= 0; --i) {
+            victim_oids[i] = victim_toid.oid;
+            victim_toid = D_RO(victim_toid)->pmem_list_prev;
+        }
+        return C_OK;
+    }
+    return C_ERR;
+}
+#endif
+
+#ifdef TODIS
 PMEMoid getBestEvictionKeyPMEMoid(void) {
     TOID(struct redis_pmem_root) root;
     struct redis_pmem_root *root_obj;
@@ -390,6 +458,28 @@ PMEMoid getBestEvictionKeyPMEMoid(void) {
         return victim_toid.oid;
     }
     return OID_NULL;
+}
+#endif
+
+#ifdef TODIS
+struct key_val_pair_PM *getBestEvictionPMObject(void) {
+    PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
+
+    if (OID_IS_NULL(victim_oid))
+        return NULL;
+
+    return getPMObjectFromOid(victim_oid);
+}
+#endif
+
+#ifdef TODIS
+sds getBestEvictionKeyPM(void) {
+    struct key_val_pair_PM *victim_obj = getBestEvictionPMObject();
+
+    if (victim_obj == NULL)
+        return NULL;
+
+    return getKeyFromPMObject(victim_obj);
 }
 #endif
 
@@ -441,24 +531,74 @@ sds getValFromOid(PMEMoid oid) {
 #endif
 
 #ifdef TODIS
-struct key_val_pair_PM *getBestEvictionPMObject(void) {
-    PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
+int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList START");
+    struct redis_pmem_root *root = pmemobj_direct(server.pm_rootoid.oid);
 
-    if (OID_IS_NULL(victim_oid))
-        return NULL;
+    TOID(struct key_val_pair_PM) start_toid = TOID_NULL(struct key_val_pair_PM);
 
-    return getPMObjectFromOid(victim_oid);
-}
-#endif
+    if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
+        // TODO(totoro): Implements eviction node algorithm for RAMDOM policy...
+        /*for (size_t i = 0; i < server.pmem_victim_count; ++i) {*/
+            /*TOID(struct key_val_pair_PM) victim_toid;*/
+            /*TOID(struct key_val_pair_PM) victim_legacy_root_toid;*/
 
-#ifdef TODIS
-sds getBestEvictionKeyPM(void) {
-    struct key_val_pair_PM *victim_obj = getBestEvictionPMObject();
+            /*PMEMoid victim_oid = victim_oids[i];*/
+            /*if (OID_IS_NULL(victim_oid)) {*/
+                /*serverLog(LL_TODIS, "TODIS_ERROR, victim_oid is null");*/
+                /*return C_ERR;*/
+            /*}*/
 
-    if (victim_obj == NULL)
-        return NULL;
+            /*[> Adds victim node to Victim list. <]*/
+            /*root = pmemobj_direct(server.pm_rootoid.oid);*/
+            /*victim_obj = (struct key_val_pair_PM *)pmemobj_direct(victim_oid);*/
+            /*victim_toid.oid = victim_oid;*/
 
-    return getKeyFromPMObject(victim_obj);
+            /*victim_legacy_root_toid = start;*/
+            /*if (!TOID_IS_NULL(start)) {*/
+                /*struct key_val_pair_PM *head = D_RW(start);*/
+                /*TX_ADD_FIELD_DIRECT(head, pmem_list_prev);*/
+                /*head->pmem_list_prev = victim_toid;*/
+            /*}*/
+
+            /*start = victim_toid;*/
+            /*if (TOID_IS_NULL(end)) {*/
+                /*end = victim_toid;*/
+                /*struct key_val_pair_PM *rear = D_RW(end);*/
+                /*TX_ADD_FIELD_DIRECT(rear, pmem_list_next);*/
+                /*rear->pmem_list_next = root->victim_start;*/
+
+                /*struct key_val_pair_PM *old_victim_head = D_RW(root->victim_start);*/
+                /*TX_ADD_FIELD_DIRECT(old_victim_head, pmem_list_prev);*/
+                /*old_victim_head->pmem_list_prev = end;*/
+            /*}*/
+
+            /*TX_ADD_DIRECT(root);*/
+            /*root->victim_start = start;*/
+
+            /*serverLog(LL_TODIS, "TODIS, victim key: %s", getKeyFromOid(victim_oid));*/
+
+            /*[> Unlinks victim node from PMEM list. <]*/
+            /*pmemUnlinkFromPmemList(victim_oid);*/
+            /*victim_obj->pmem_list_next = victim_legacy_root_toid;*/
+        /*}*/
+        serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList RANDOM END");
+        return C_ERR;
+    }
+    else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
+        PMEMoid start_oid = victim_oids[0];
+        start_toid.oid = start_oid;
+
+        TX_ADD_FIELD_DIRECT(root, pe_last);
+        root->victim_first = start_toid;
+        root->pe_last = D_RO(start_toid)->pmem_list_prev;
+
+        serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList LRU END");
+        return C_OK;
+    }
+
+    return C_ERR;
 }
 #endif
 
@@ -512,21 +652,35 @@ void freeVictim(PMEMoid oid) {
 #endif
 
 #ifdef TODIS
-void freeVictimList() {
+void freeVictimList(PMEMoid start_oid) {
     serverLog(LL_TODIS, "   ");
     serverLog(LL_TODIS, "TODIS, freeVictimList START");
     struct redis_pmem_root *root;
 
     root = pmemobj_direct(server.pm_rootoid.oid);
+    TOID(struct key_val_pair_PM) victim_first_toid;
+    victim_first_toid.oid = start_oid;
+
+    if (OID_IS_NULL(start_oid))
+        return;
+
+    /* Unlinks victim list from another victim list. */
+    if (TOID_EQUALS(root->victim_first, victim_first_toid)) {
+        TX_ADD_DIRECT(root);
+        root->victim_first = TOID_NULL(struct key_val_pair_PM);
+    }
+    TOID(struct key_val_pair_PM) prev_toid = D_RO(victim_first_toid)->pmem_list_prev;
+    struct key_val_pair_PM *prev_obj = pmemobj_direct(prev_toid.oid);
+    prev_obj->pmem_list_next = TOID_NULL(struct key_val_pair_PM);
 
     /* Free all Victim list. */
-    while (!TOID_IS_NULL(root->victim_first)) {
-        TOID(struct key_val_pair_PM) next_toid = D_RO(root->victim_first)->pmem_list_next;
-        freeVictim((root->victim_first).oid);
-        TX_FREE(root->victim_first);
+    while (!TOID_IS_NULL(victim_first_toid)) {
+        TOID(struct key_val_pair_PM) next_toid = D_RO(victim_first_toid)->pmem_list_next;
+        freeVictim(victim_first_toid.oid);
+        TX_FREE(victim_first_toid);
         TX_ADD_DIRECT(root);
         root->num_victim_entries--;
-        root->victim_first = next_toid;
+        victim_first_toid = next_toid;
     }
     serverLog(LL_TODIS, "TODIS, freeVictimList END");
 }
@@ -558,3 +712,8 @@ size_t sizeOfPmemNode(PMEMoid oid) {
 }
 #endif
 
+#ifdef TODIS
+struct redis_pmem_root *getPmemRootObject(void) {
+    return pmemobj_direct(server.pm_rootoid.oid);
+}
+#endif

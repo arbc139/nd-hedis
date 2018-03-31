@@ -191,7 +191,9 @@ void *bioProcessBackgroundJobs(void *arg) {
             aof_fsync((long)job->arg1);
 #ifdef TODIS
             TX_BEGIN(server.pm_pool) {
-                freeVictimList();
+                PMEMoid *victim_first_ptr = (PMEMoid *)job->arg2;
+                freeVictimList(*victim_first_ptr);
+                zfree(victim_first_ptr);
             } TX_ONABORT {
                 serverLog(LL_TODIS, "TODIS, Flush victim list failed (%s)", __func__);
             } TX_END

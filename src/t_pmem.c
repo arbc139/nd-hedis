@@ -266,7 +266,7 @@ void getListPmemStatusCommand(client *c) {
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
     for (kv_PM_oid = D_RO(root)->pe_first;
-        TOID_IS_NULL(kv_PM_oid) == 0;
+        ;
         kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_next
     ) {
         kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
@@ -276,6 +276,9 @@ void getListPmemStatusCommand(client *c) {
         sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
+
+        if (TOID_EQUALS(kv_PM_oid, D_RO(root)->pe_last))
+            break;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
@@ -295,7 +298,7 @@ void getReverseListPmemStatusCommand(client *c) {
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
     for (kv_PM_oid = D_RO(root)->pe_last;
-        TOID_IS_NULL(kv_PM_oid) == 0;
+        ;
         kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_prev
     ) {
         kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
@@ -305,6 +308,9 @@ void getReverseListPmemStatusCommand(client *c) {
         sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
+
+        if (TOID_EQUALS(kv_PM_oid, D_RO(root)->pe_first))
+            break;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);

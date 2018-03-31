@@ -203,14 +203,38 @@ ssize_t aofRewriteBufferWrite(int fd) {
 /* Starts a background task that performs fsync() against the specified
  * file descriptor (the one of the AOF file) in another thread. */
 void aof_background_fsync(int fd) {
-    bioCreateBackgroundJob(BIO_AOF_FSYNC,(void*)(long)fd,NULL,NULL);
+    bioCreateBackgroundJob(
+            BIO_AOF_FSYNC,
+            (void*)(long)fd,
+            NULL,
+            NULL);
 }
+
+#ifdef TODIS
+void aof_background_fsync_TODIS(int fd) {
+    PMEMoid *victim_first_ptr = zmalloc(sizeof(PMEMoid));
+    TX_BEGIN(server.pm_pool) {
+        struct redis_pmem_root *root;
+        root = pmemobj_direct(server.pm_rootoid.oid); 
+        *victim_first_ptr = root->victim_first.oid;
+    } TX_ONABORT {
+        serverLog(LL_TODIS, "TODIS_ERROR, getting root failed");
+    } TX_END
+
+    bioCreateBackgroundJob(
+            BIO_AOF_FSYNC,
+            (void*)(long)fd,
+            (void*)victim_first_ptr,
+            NULL);
+}
+#endif
 
 #ifdef TODIS
 void aofFsyncWithFlushVictim(int fd) {
     aof_fsync(fd);
     TX_BEGIN(server.pm_pool) {
-        freeVictimList();
+        struct redis_pmem_root *root = getPmemRootObject();
+        freeVictimList(root->victim_first.oid);
     } TX_ONABORT {
         serverLog(LL_TODIS, "TODIS_ERROR, free victim list failed: (%s)", __func__);
     } TX_END
@@ -464,7 +488,13 @@ void flushAppendOnlyFile(int force) {
         server.aof_last_fsync = server.unixtime;
     } else if ((server.aof_fsync == AOF_FSYNC_EVERYSEC &&
                 server.unixtime > server.aof_last_fsync)) {
-        if (!sync_in_progress) aof_background_fsync(server.aof_fd);
+        if (!sync_in_progress) {
+#ifdef TODIS
+            aof_background_fsync_TODIS(server.aof_fd); 
+#else
+            aof_background_fsync(server.aof_fd);
+#endif
+        }
         server.aof_last_fsync = server.unixtime;
     }
 #ifdef TODIS
@@ -479,7 +509,7 @@ void forceFlushAppendOnlyFileTODIS(void) {
         aofFsyncWithFlushVictim(server.aof_fd);
         server.aof_last_fsync = server.unixtime;
     } else if (server.aof_fsync == AOF_FSYNC_EVERYSEC) {
-        aof_background_fsync(server.aof_fd);
+        aof_background_fsync_TODIS(server.aof_fd);
         server.aof_last_fsync = server.unixtime;
     }
 }
@@ -1535,8 +1565,13 @@ void backgroundRewriteDoneHandler(int exitcode, int bysignal) {
 #else
                 aof_fsync(newfd);
 #endif
-            else if (server.aof_fsync == AOF_FSYNC_EVERYSEC)
+            else if (server.aof_fsync == AOF_FSYNC_EVERYSEC) {
+#ifdef TODIS
+                aof_background_fsync_TODIS(newfd);
+#else
                 aof_background_fsync(newfd);
+#endif
+            }
             server.aof_selected_db = -1; /* Make sure SELECT is re-issued */
             aofUpdateCurrentSize();
             server.aof_rewrite_base_size = server.aof_current_size;

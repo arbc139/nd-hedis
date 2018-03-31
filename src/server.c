@@ -1348,7 +1348,6 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
          }
     }
 
-
     /* AOF postponed flush: Try at every cron cycle if the slow fsync
      * completed. */
     if (server.aof_flush_postponed_start) flushAppendOnlyFile(0);
@@ -3854,7 +3853,10 @@ int freeMemoryIfNeeded(void) {
 
 #ifdef TODIS
 int freePmemMemoryIfNeeded(void) {
-    size_t pmem_used, pmem_tofree, pmem_freed;
+    /* Compute how much pmem memory we need to free. */
+    size_t pmem_used = pmem_used_memory();
+    size_t pmem_tofree = pmem_used - server.max_pmem_memory;
+    size_t pmem_freed = 0;
 
     pmem_used = pmem_used_memory();
 
@@ -3864,41 +3866,50 @@ int freePmemMemoryIfNeeded(void) {
     if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
         return C_ERR; /* We need to free pmem memory, but policy forbids. */
 
-    /* Compute how much pmem memory we need to free. */
-    pmem_tofree = pmem_used - server.max_pmem_memory;
-    pmem_freed = 0;
-
     serverLog(LL_TODIS, "##############################");
     serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
 
     while (pmem_freed < pmem_tofree) {
-        int j, k, keys_freed = 0;
-        dictEntry *victim_de;
-        redisDb *db;
+        serverLog(LL_TODIS, "TODIS, pmem freed: %zu, pmem tofree: %zu", pmem_freed, pmem_tofree);
+        int keys_freed = 0;
+        dictEntry *victim_de = NULL;
+        redisDb *db = NULL;
 
         /* Find a victim key. */
         long long free_pmem_time_find_victim_key_start = ustime();
-        PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
-        sds victim_key = getKeyFromOid(victim_oid);
-        if (victim_key == NULL) return C_ERR;
-        for (j = 0; j < server.dbnum; j++) {
-            /* Find expired first. */
-            victim_de = dictFind(server.db[j].expires, victim_key);
-            if (victim_de != NULL) {
-                db = &server.db[j];
-                break;
-            }
-            victim_de = dictFind(server.db[j].dict, victim_key);
-            if (victim_de != NULL) {
-                db = &server.db[j];
-                break;
-            }
-        }
+        PMEMoid *victim_oids = zmalloc(sizeof(PMEMoid) * server.pmem_victim_count);
+        if (getBestEvictionKeysPMEMoid(victim_oids) == C_ERR)
+            return C_ERR;
         long long free_pmem_time_find_victim_key_end = ustime();
         server.free_pmem_time_find_victim_key += free_pmem_time_find_victim_key_end - free_pmem_time_find_victim_key_start;
 
-        /* Finally remove the selected key. */
-        if (db != NULL && victim_de != NULL) {
+        for (size_t i = 0; i < server.pmem_victim_count; ++i) {
+            PMEMoid victim_oid = victim_oids[i];
+            sds victim_key = getKeyFromOid(victim_oid);
+            if (victim_key == NULL) return C_ERR;
+            /* Find victim dict entry */
+            for (int j = 0; j < server.dbnum; j++) {
+                /* Find expired first. */
+                victim_de = dictFind(server.db[j].expires, victim_key);
+                if (victim_de != NULL) {
+                    db = &server.db[j];
+                    break;
+                }
+                victim_de = dictFind(server.db[j].dict, victim_key);
+                if (victim_de != NULL) {
+                    db = &server.db[j];
+                    break;
+                }
+            }
+
+            if (db == NULL || victim_de == NULL) {
+                if (keys_freed)
+                    continue;
+                serverLog(LL_TODIS, "TODIS_ERROR, Victim entry is not exist");
+                return C_ERR; /* Nothing to free... */
+            }
+
+            /* Finally remove the selected key. */
             long long delta;
             serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", victim_de);
 
@@ -3931,19 +3942,6 @@ int freePmemMemoryIfNeeded(void) {
             long long free_pmem_time_dict_unlink_end = ustime();
             server.free_pmem_time_dict_unlink += free_pmem_time_dict_unlink_end - free_pmem_time_dict_unlink_start;
 
-            long long free_pmem_time_pmem_eviction_start = ustime();
-            /* (TIER 2) Evict PMEM node from PMEM list to Victim list. */
-            TX_BEGIN(server.pm_pool) {
-                evictPmemNodeToVictimList(victim_oid);
-            } TX_ONABORT {
-                serverLog(
-                        LL_TODIS,
-                        "TODIS_ERROR: evict pmem node to victim list failed (%s)",
-                        __func__);
-            } TX_END
-            long long free_pmem_time_pmem_eviction_end = ustime();
-            server.free_pmem_time_pmem_eviction += free_pmem_time_pmem_eviction_end - free_pmem_time_pmem_eviction_start;
-
             long long free_pmem_time_pmem_entry_free_start = ustime();
             /* Free pmem dictEntry
              * This is not free key and val.
@@ -3972,164 +3970,20 @@ int freePmemMemoryIfNeeded(void) {
             pmem_freed += sizeOfPmemNode(victim_oid);
             keys_freed++;
         }
-        if (!keys_freed)
-            return C_ERR; /* nothing to free... */
-    }
 
-    serverLog(LL_TODIS, "##############################");
-    return C_OK;
-}
-
-int freePmemMemoryIfNeededBackup(void) {
-    size_t pmem_used, pmem_tofree, pmem_freed;
-
-    pmem_used = pmem_used_memory();
-
-    /* Check if we are over the persistent memory limit. */
-    if (pmem_used <= server.max_pmem_memory) return C_OK;
-
-    if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
-        return C_ERR; /* We need to free pmem memory, but policy forbids. */
-
-    /* Compute how much pmem memory we need to free. */
-    pmem_tofree = pmem_used - server.max_pmem_memory;
-    pmem_freed = 0;
-
-    serverLog(LL_TODIS, "##############################");
-    serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
-
-    while (pmem_freed < pmem_tofree) {
-        int j, k, keys_freed = 0;
-
-        for (j = 0; j < server.dbnum; j++) {
-            long bestval = 0; /* just to prevent warning */
-            dictEntry *de;
-            redisDb *db = server.db + j;
-            dict *dict;
-            dictEntry *bestde;
-
-            if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU ||
-                server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM) {
-                dict = server.db[j].dict;
-            } else {
-                dict = server.db[j].expires;
-            }
-            if (dictSizePM(dict) == 0) continue;
-
-            /* volatile-random and allkeys-random policy */
-            if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_RANDOM ||
-                server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_RANDOM) {
-                bestde = dictGetRandomKeyPM(dict);
-            }
-
-            /* volatile-lru and allkeys-lru policy */
-            else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU ||
-                    server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_LRU) {
-               struct evictionPoolEntry *pool = db -> eviction_pool;
-
-               while (bestde == NULL) {
-                   evictionPoolPopulatePM(dict, db->dict, db->eviction_pool);
-                   /* Go backward from best to worst element to evict. */
-                   for (k = MAXMEMORY_EVICTION_POOL_SIZE-1; k >= 0; k--) {
-                       if (pool[k].key == NULL) continue;
-                       de = dictFind(dict, pool[k].key);
-
-                       if (de->location == LOCATION_DRAM) continue;
-
-                       /* Remove the entry from the pool. */
-                       sdsfree(pool[k].key);
-                       /* Shift all elements on its right to left. */
-                       memmove(pool+k, pool+k+1,
-                               sizeof(pool[0])*(MAXMEMORY_EVICTION_POOL_SIZE-k-1));
-                       /* Clear the element on the right which is empty
-                        * since we shifted one position to the left. */
-                       pool[MAXMEMORY_EVICTION_POOL_SIZE-1].key = NULL;
-                       pool[MAXMEMORY_EVICTION_POOL_SIZE-1].idle = 0;
-
-                       /* If the key exists, is our pick. Otherwise it is
-                        * a ghost and we need to try the next element. */
-                       if (de) {
-                           bestde = de;
-                           break;
-                       } else {
-                           /* Ghost... */
-                           continue;
-                       }
-                   }
-               }
-            }
-
-            /* volatile-ttl */
-            else if (server.max_pmem_memory_policy == MAXMEMORY_VOLATILE_TTL) {
-                for (k = 0; k < server.maxmemory_samples; k++) {
-                    long thisval;
-
-                    de = dictGetRandomKeyPM(dict);
-                    thisval = (long) dictGetVal(de);
-
-                    /* Expire sooner (minor expire unix timestamp) is better
-                     * candidate for deletion */
-                    if (bestde == NULL || thisval < bestval) {
-                        bestde = de;
-                        bestval = thisval;
-                    }
-                }
-            }
-
-            /* Finally remove the selected key. */
-            if (bestde != NULL) {
-                long long delta;
-                serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", bestde);
-
-                sds bestkey = dictGetKey(bestde);
-                robj *bestval = (robj *) dictGetVal(bestde);
-
-                serverLog(
-                        LL_TODIS,
-                        "TODIS, eviction bestkey: %s, bestval: %s",
-                        bestkey,
-                        bestval->ptr);
-
-                sds dramkey = sdsdup(bestkey);
-                robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
-
-                serverLog(
-                        LL_TODIS,
-                        "TODIS, eviction dramkey: %s, dramval: %s",
-                        dramkey,
-                        dramval->ptr);
-
-                robj *keyobj = createStringObject(bestkey, sdslen(bestkey));
-                /* Unlink PMEM dictEntry from DB. */
-                dictEntry *pmementry = dbDeleteNoFree(db, keyobj);
-
-                /* Adds DRAM dictEntry to DB. */
-                robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
-                dbAdd(db, dramkeyobj, dramval);
-                /* Evicts to aof logs. */
-                feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
-                decrRefCount(dramkeyobj);
-
-                /* Remove PMEM dictEntry from pmem.
-                 * We compute the amount of memory freed by dbDelete() alone.
-                 * It is possible that actually the memory needed to propagte
-                 * the DEL in AOF and replication link is greater than the one
-                 * \we are freeing removing the key, but we can't account for
-                 * that otherwise we would never exit the loop.
-                 *
-                 * AOF and Output buffer memory will be freed eventually so
-                 * we only care about memory used by the key space. */
-                delta = (long long) server.used_pmem_memory;
-                dbFreeEntry(db, pmementry);
-                delta -= server.used_pmem_memory;
-                pmem_freed += delta;
-                decrRefCount(keyobj);
-                keys_freed++;
-            }
-        }
-        if (!keys_freed) {
-            return C_ERR; /* nothing to free... */
-        }
+        long long free_pmem_time_pmem_eviction_start = ustime();
+        /* (TIER 2) Evict PMEM node from PMEM list to Victim list. */
+        TX_BEGIN(server.pm_pool) {
+            evictPmemNodesToVictimList(victim_oids);
+        } TX_ONABORT {
+            serverLog(
+                    LL_TODIS,
+                    "TODIS_ERROR: evict pmem node to victim list failed (%s)",
+                    __func__);
+        } TX_END
+        zfree(victim_oids);
+        long long free_pmem_time_pmem_eviction_end = ustime();
+        server.free_pmem_time_pmem_eviction += free_pmem_time_pmem_eviction_end - free_pmem_time_pmem_eviction_start;
     }
 
     serverLog(LL_TODIS, "##############################");
@@ -4139,10 +3993,7 @@ int freePmemMemoryIfNeededBackup(void) {
 
 #ifdef TODIS
 void writeStatusLogs(void) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, writeStatusLogs START");
     serverLog(LL_TODIS, "TODIS, pmem memory used: %zu", pmem_used_memory());
-    serverLog(LL_TODIS, "TODIS, writeStatusLogs END");
 }
 #endif
 
@@ -4671,7 +4522,7 @@ int main(int argc, char **argv) {
 #ifdef USE_PMDK
         if (server.pm_reconstruct_required) {
             long long start = ustime();
-            int reconstruct_result;
+            int reconstruct_result = C_ERR;
 #ifndef TODIS
             reconstruct_result = pmemReconstruct();
 #else
