@@ -3885,6 +3885,8 @@ int freePmemMemoryIfNeeded(void) {
 
         for (size_t i = 0; i < server.pmem_victim_count; ++i) {
             PMEMoid victim_oid = victim_oids[i];
+            if (OID_IS_NULL(victim_oid))
+                continue;
             sds victim_key = getKeyFromOid(victim_oid);
             if (victim_key == NULL) return C_ERR;
             /* Find victim dict entry */

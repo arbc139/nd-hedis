@@ -402,7 +402,6 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
         serverLog(
                 LL_TODIS,
                 "TODIS_ERROR, Number of victim count is larger than pmem entries!");
-        return C_ERR;
     }
 
     /* allkeys-random policy */
@@ -422,6 +421,11 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
     else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
         TOID(struct key_val_pair_PM) victim_toid = root_obj->pe_last;
         for (int i = server.pmem_victim_count - 1; i >= 0; --i) {
+            int count = server.pmem_victim_count - i;
+            if (count > num_pmem_entries) {
+                victim_oids[i] = OID_NULL;
+                continue;
+            }
             victim_oids[i] = victim_toid.oid;
             victim_toid = D_RO(victim_toid)->pmem_list_prev;
         }
@@ -587,12 +591,21 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
         return C_ERR;
     }
     else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
-        PMEMoid start_oid = victim_oids[0];
+        PMEMoid start_oid;
+        for (size_t i = 0; i < server.pmem_victim_count; ++i) {
+            if (!OID_IS_NULL(victim_oids[i])) {
+                start_oid = victim_oids[i];
+                break;
+            }
+        }
         start_toid.oid = start_oid;
 
         TX_ADD_FIELD_DIRECT(root, pe_last);
         root->victim_first = start_toid;
         root->pe_last = D_RO(start_toid)->pmem_list_prev;
+        if (TOID_IS_NULL(root->pe_last)) {
+            root->pe_first = TOID_NULL(struct key_val_pair_PM);
+        }
 
         serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList LRU END");
         return C_OK;
@@ -670,8 +683,10 @@ void freeVictimList(PMEMoid start_oid) {
         root->victim_first = TOID_NULL(struct key_val_pair_PM);
     }
     TOID(struct key_val_pair_PM) prev_toid = D_RO(victim_first_toid)->pmem_list_prev;
-    struct key_val_pair_PM *prev_obj = pmemobj_direct(prev_toid.oid);
-    prev_obj->pmem_list_next = TOID_NULL(struct key_val_pair_PM);
+    if (!TOID_IS_NULL(prev_toid)) {
+        struct key_val_pair_PM *prev_obj = pmemobj_direct(prev_toid.oid);
+        prev_obj->pmem_list_next = TOID_NULL(struct key_val_pair_PM);
+    }
 
     /* Free all Victim list. */
     while (!TOID_IS_NULL(victim_first_toid)) {
