@@ -3912,7 +3912,6 @@ int freePmemMemoryIfNeeded(void) {
             }
 
             /* Finally remove the selected key. */
-            long long delta;
             serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", victim_de);
 
             long long free_pmem_time_make_dram_key_val_start = ustime();

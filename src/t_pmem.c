@@ -257,28 +257,34 @@ void getListPmemStatusCommand(client *c) {
     unsigned long numreplies = 0;
     char str_buf[1024];
     TOID(struct redis_pmem_root) root;
-    TOID(struct key_val_pair_PM) kv_PM_oid;
-    struct key_val_pair_PM *kv_PM;
+    TOID(struct key_val_pair_PM) node_toid;
+    struct key_val_pair_PM *node_obj;
     void *key;
     void *val;
     void *pmem_base_addr;
 
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
-    for (kv_PM_oid = D_RO(root)->pe_first;
-        ;
-        kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_next
-    ) {
-        kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
-        key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
-        val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
+    node_toid = D_RO(root)->pe_first;
+    if (TOID_IS_NULL(node_toid)) {
+        setDeferredMultiBulkLength(c, replylen, numreplies);
+        return;
+    }
+    while (1) {
+        node_obj = (key_val_pair_PM *)(
+                node_toid.oid.off + (uint64_t) pmem_base_addr
+        );
+        key = (void *)(node_obj->key_oid.off + (uint64_t) pmem_base_addr);
+        val = (void *)(node_obj->val_oid.off + (uint64_t) pmem_base_addr);
 
         sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
 
-        if (TOID_EQUALS(kv_PM_oid, D_RO(root)->pe_last))
+        if (TOID_EQUALS(node_toid, D_RO(root)->pe_last))
             break;
+
+        node_toid = D_RO(node_toid)->pmem_list_next;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
@@ -289,28 +295,34 @@ void getReverseListPmemStatusCommand(client *c) {
     unsigned long numreplies = 0;
     char str_buf[1024];
     TOID(struct redis_pmem_root) root;
-    TOID(struct key_val_pair_PM) kv_PM_oid;
-    struct key_val_pair_PM *kv_PM;
+    TOID(struct key_val_pair_PM) node_toid;
+    struct key_val_pair_PM *node_obj;
     void *key;
     void *val;
     void *pmem_base_addr;
 
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
-    for (kv_PM_oid = D_RO(root)->pe_last;
-        ;
-        kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_prev
-    ) {
-        kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t) pmem_base_addr);
-        key = (void *)(kv_PM->key_oid.off + (uint64_t) pmem_base_addr);
-        val = (void *)(kv_PM->val_oid.off + (uint64_t) pmem_base_addr);
+    node_toid = D_RO(root)->pe_last;
+    if (TOID_IS_NULL(node_toid)) {
+        setDeferredMultiBulkLength(c, replylen, numreplies);
+        return;
+    }
+    while (1) {
+        node_obj = (key_val_pair_PM *)(
+                node_toid.oid.off + (uint64_t) pmem_base_addr
+        );
+        key = (void *)(node_obj->key_oid.off + (uint64_t) pmem_base_addr);
+        val = (void *)(node_obj->val_oid.off + (uint64_t) pmem_base_addr);
 
         sprintf(str_buf, "key: %s, val: %s", (sds) key, (sds) val);
         addReplyBulkCString(c, str_buf);
         numreplies++;
 
-        if (TOID_EQUALS(kv_PM_oid, D_RO(root)->pe_first))
+        if (TOID_EQUALS(node_toid, D_RO(root)->pe_first))
             break;
+
+        node_toid = D_RO(node_toid)->pmem_list_prev;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);

@@ -96,11 +96,15 @@ int pmemReconstructTODIS(void) {
     forceFlushAppendOnlyFileTODIS();
 
     /* Reconstruct pmem lists */
-    for (pmem_toid = D_RO(root)->pe_first;
-        ;
-        pmem_toid = D_RO(pmem_toid)->pmem_list_next
-    ) {
-		pmem_obj = (key_val_pair_PM *)(pmem_toid.oid.off + (uint64_t)pmem_base_addr);
+    pmem_toid = D_RO(root)->pe_first;
+    if (TOID_IS_NULL(pmem_toid)) {
+        serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
+        return C_OK;
+    }
+    while (1) {
+        pmem_obj = (key_val_pair_PM *)(
+                pmem_toid.oid.off + (uint64_t)pmem_base_addr
+        );
 		key = (void *)(pmem_obj->key_oid.off + (uint64_t)pmem_base_addr);
 		val = (void *)(pmem_obj->val_oid.off + (uint64_t)pmem_base_addr);
 
@@ -116,6 +120,7 @@ int pmemReconstructTODIS(void) {
         if (TOID_EQUALS(pmem_toid, D_RO(root)->pe_last)) {
             break;
         }
+        pmem_toid = D_RO(pmem_toid)->pmem_list_next;
     }
 
     serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
@@ -398,6 +403,8 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
     root_obj = pmemobj_direct(root.oid);
     num_pmem_entries = root_obj->num_dict_entries;
 
+    // TODO(totoro): Improves overflow case that performance not bind to this
+    // useless loop...
     if (server.pmem_victim_count > num_pmem_entries) {
         serverLog(
                 LL_TODIS,
@@ -421,7 +428,7 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
     else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
         TOID(struct key_val_pair_PM) victim_toid = root_obj->pe_last;
         for (int i = server.pmem_victim_count - 1; i >= 0; --i) {
-            int count = server.pmem_victim_count - i;
+            size_t count = server.pmem_victim_count - i;
             if (count > num_pmem_entries) {
                 victim_oids[i] = OID_NULL;
                 continue;
@@ -591,12 +598,19 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
         return C_ERR;
     }
     else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
-        PMEMoid start_oid;
+        PMEMoid start_oid = OID_NULL;
         for (size_t i = 0; i < server.pmem_victim_count; ++i) {
             if (!OID_IS_NULL(victim_oids[i])) {
                 start_oid = victim_oids[i];
+                TX_ADD_DIRECT(root);
+                root->num_dict_entries -= server.pmem_victim_count - i;
+                root->num_victim_entries += server.pmem_victim_count - i;
                 break;
             }
+        }
+        if (OID_IS_NULL(start_oid)) {
+            serverLog(LL_TODIS, "TODIS_CRITICAL_ERROR, all of victim oids is null");
+            return C_ERR;
         }
         start_toid.oid = start_oid;
 
@@ -674,8 +688,10 @@ void freeVictimList(PMEMoid start_oid) {
     TOID(struct key_val_pair_PM) victim_first_toid;
     victim_first_toid.oid = start_oid;
 
-    if (OID_IS_NULL(start_oid))
+    if (OID_IS_NULL(start_oid)) {
+        serverLog(LL_TODIS, "TODIS, freeVictimList END");
         return;
+    }
 
     /* Unlinks victim list from another victim list. */
     if (TOID_EQUALS(root->victim_first, victim_first_toid)) {
