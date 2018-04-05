@@ -1,6 +1,8 @@
 nd-hedis
-NVM-DRAM Hybrid redis
-Implemented by totorody
+
+NVM-DRAM Hybrid redis.
+
+Implemented by totorody.
 
 -------------
 This README is just a fast *quick start* document. You can find more detailed documentation at http://redis.io.
