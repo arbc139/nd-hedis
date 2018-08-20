@@ -411,6 +411,31 @@ err:
     if (!log_to_stdout) close(fd);
 }
 
+/* Return the UNIX time in nanoseconds */
+struct timespec nstimespec(void) {
+    struct timespec spec;
+    clock_gettime(CLOCK_REALTIME, &spec);
+    return spec;
+}
+
+int nstimeCompare(const struct timespec a, const struct timespec b) {
+    if (a.tv_sec != b.tv_sec) {
+        if (a.tv_sec > b.tv_sec) {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    if (a.tv_nsec > b.tv_nsec) {
+        return 1;
+    } else if (a.tv_nsec < b.tv_nsec) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 /* Return the UNIX time in microseconds */
 long long ustime(void) {
     struct timeval tv;
@@ -2262,7 +2287,7 @@ struct redisCommand *lookupCommandOrOriginal(sds name) {
 void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
                int flags)
 {
-#ifndef NDHEDIS
+#ifndef USE_ND
     if (server.aof_state != AOF_OFF && flags & PROPAGATE_AOF)
         feedAppendOnlyFile(cmd,dbid,argv,argc);
 #endif
@@ -4524,7 +4549,7 @@ int main(int argc, char **argv) {
         if (server.pm_reconstruct_required) {
             long long start = ustime();
             int reconstruct_result = C_ERR;
-#ifndef NDHEDIS
+#ifndef USE_ND
             reconstruct_result = pmemReconstruct();
 #else
             TX_BEGIN(server.pm_pool) {

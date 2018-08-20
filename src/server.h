@@ -883,7 +883,9 @@ struct redisServer {
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
     int max_pmem_memory_policy;     /* Policy for key eviction */
     size_t pmem_victim_count;       /* Number of Victim in eviction */
-    int verbosity_nd_only;             /* Force to write nd-hedis log only */
+    int verbosity_nd_only;          /* Force to write nd-hedis log only */
+    size_t pm_read_latency;         /* Read latency */
+    size_t pm_write_latency;        /* Write latency */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
@@ -1171,6 +1173,8 @@ extern dictType replScriptCacheDictType;
  *----------------------------------------------------------------------------*/
 
 /* Utils */
+struct timespec nstimespec(void);
+int nstimeCompare(const struct timespec a, const struct timespec b);
 long long ustime(void);
 long long mstime(void);
 void getRandomHexChars(char *p, unsigned int len);
