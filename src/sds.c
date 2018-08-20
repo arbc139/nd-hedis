@@ -42,6 +42,10 @@
 #include "server.h"
 #endif
 
+#ifdef USE_ND
+#include "pmem_latency.h"
+#endif
+
 static inline int sdsHdrSize(char type) {
     switch(type&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -164,8 +168,8 @@ sds sdsnewlenPM(const void *init, size_t initlen) {
 
     hdrlen += sizeof(PMEMoid);
     size_t totallen = hdrlen + initlen + 1;
-    oid = pmemobj_tx_zalloc(totallen, PM_TYPE_SDS);
-    sh = pmemobj_direct(oid);
+    oid = pmemobj_tx_zalloc_latency(totallen, PM_TYPE_SDS);
+    sh = pmemobj_direct_latency(oid);
 
 #ifdef USE_ND
     serverLog(LL_ND, "NDHEDIS, sdsnewlenPM sds size: %zu", totallen);
@@ -270,7 +274,7 @@ void sdsfreePM(sds s) {
         serverLog(LL_ND, "NDHEDIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
         server.used_pmem_memory -= sdsAllocSizePM(s);
 #endif
-        pmemobj_tx_free(oid);
+        pmemobj_tx_free_latency(oid);
     } else {
         s_free((char*)s-sdsHdrSize(s[-1]));
     }
@@ -285,7 +289,7 @@ void sdsfreeVictim(sds s) {
     if (server.persistent) {
         oid.off = (uint64_t)((char*)s-sdsHdrSize(s[-1])) - sizeof(PMEMoid) - (uint64_t)server.pm_pool;
         oid.pool_uuid_lo = server.pool_uuid_lo;
-        pmemobj_tx_free(oid);
+        pmemobj_tx_free_latency(oid);
     } else {
         s_free((char*)s-sdsHdrSize(s[-1]));
     }

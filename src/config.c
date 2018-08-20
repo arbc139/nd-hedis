@@ -445,6 +445,16 @@ void loadServerConfigFromString(char *config) {
             }
             server.max_pmem_memory = max_pmem_memory;
 #endif
+#ifdef USE_ND
+        } else if (!strcasecmp(argv[0], "pm-read-latency") && (argc == 2)) {
+            long long pm_read_latency = atoi(argv[1]);
+            server.pm_read_latency = pm_read_latency;
+#endif
+#ifdef USE_ND
+        } else if (!strcasecmp(argv[0], "pm-write-latency") && (argc == 2)) {
+            long long pm_write_latency = atoi(argv[1]);
+            server.pm_write_latency = pm_write_latency;
+#endif
         } else if (!strcasecmp(argv[0],"appendonly") && argc == 2) {
             int yes;
 
