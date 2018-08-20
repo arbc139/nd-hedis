@@ -296,7 +296,7 @@ struct redisCommand redisCommandTable[] = {
     {"pfdebug",pfdebugCommand,-3,"w",0,NULL,0,0,0,0,0},
     {"post",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
     {"host:",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
-#ifdef TODIS
+#ifdef USE_ND
     {"aofset",aofSetCommand,-3,"wm",0,NULL,1,1,1,0,0},
     {"pmprocesstime",getPmemProcessTimeCommand,1,"r",0,NULL,0,0,0,0,0},
     {"pmemstatus",getPmemStatusCommand,1,"r",0,NULL,0,0,0,0,0},
@@ -323,10 +323,10 @@ void serverLogRaw(int level, const char *msg) {
     int log_to_stdout = server.logfile[0] == '\0';
 
     level &= 0xff; /* clear flags */
-#ifdef TODIS
+#ifdef USE_ND
     if (
-        (server.todis_log_only && level != LL_TODIS) ||
-        (!server.todis_log_only && level < server.verbosity)) return;
+        (server.verbosity_nd_only && level != LL_ND) ||
+        (!server.verbosity_nd_only && level < server.verbosity)) return;
 #else
     if (level < server.verbosity) return;
 #endif
@@ -368,10 +368,10 @@ void serverLog(int level, const char *fmt, ...) {
     va_list ap;
     char msg[LOG_MAX_LEN];
 
-#ifdef TODIS
+#ifdef USE_ND
     if (
-        (server.todis_log_only && (level&0xff) != LL_TODIS) ||
-        (!server.todis_log_only && (level&0xff) < server.verbosity)) return;
+        (server.verbosity_nd_only && (level&0xff) != LL_ND) ||
+        (!server.verbosity_nd_only && (level&0xff) < server.verbosity)) return;
 #else
     if ((level&0xff) < server.verbosity) return;
 #endif
@@ -503,8 +503,8 @@ void dictObjectDestructorPM(void *privdata, dictEntry *entry, void *val)
 }
 #endif
 
-#ifdef TODIS
-void dictObjectDestructorTODIS(void *privdata, dictEntry *entry, void *val) {
+#ifdef USE_ND
+void dictObjectDestructorNDHEDIS(void *privdata, dictEntry *entry, void *val) {
     if (entry->location == LOCATION_DRAM)
         dictObjectDestructor(privdata, entry, val);
     else
@@ -536,8 +536,8 @@ void dictSdsDestructorPM(void *privdata, dictEntry *entry, void *val)
 }
 #endif
 
-#ifdef TODIS
-void dictSdsDestructorTODIS(void *privdata, dictEntry *entry, void *val) {
+#ifdef USE_ND
+void dictSdsDestructorNDHEDIS(void *privdata, dictEntry *entry, void *val) {
     if (entry->location == LOCATION_DRAM)
         dictSdsDestructor(privdata, entry, val);
     else
@@ -648,14 +648,14 @@ dictType dbDictTypePM = {
 };
 #endif
 
-#ifdef TODIS
-dictType dbDictTypeTODIS = {
+#ifdef USE_ND
+dictType dbDictTypeNDHEDIS = {
     dictSdsHash,                /* hash function */
     NULL,                       /* key dup */
     NULL,                       /* val dup */
     dictSdsKeyCompare,          /* key compare */
-    dictSdsDestructorTODIS,     /* key destructor */
-    dictObjectDestructorTODIS   /* val destructor */
+    dictSdsDestructorNDHEDIS,     /* key destructor */
+    dictObjectDestructorNDHEDIS   /* val destructor */
 };
 #endif
 
@@ -827,8 +827,8 @@ int activeExpireCycleTryExpire(redisDb *db, dictEntry *de, long long now) {
         sds key = dictGetKey(de);
         robj *keyobj = createStringObject(key,sdslen(key));
 
-#ifdef TODIS
-        propagateExpireTODIS(db, de);
+#ifdef USE_ND
+        propagateExpireNDHEDIS(db, de);
 #else
         propagateExpire(db,keyobj);
 #endif
@@ -1581,12 +1581,12 @@ void initServerConfig(void) {
     server.pm_file_size = CONFIG_DEFAULT_PM_FILE_SIZE;
     server.pm_reconstruct_required = false;
 #endif
-#ifdef TODIS
+#ifdef USE_ND
     server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
     server.max_pmem_memory_policy = CONFIG_DEFAULT_MAXMEMORY_POLICY;
     server.pmem_victim_count = CONFIG_MIN_PMEM_VICTIM_COUNT;
-    server.todis_log_only = CONFIG_DEFAULT_TODIS_LOG_ONLY;
+    server.verbosity_nd_only = CONFIG_DEFAULT_NDHEDIS_LOG_ONLY;
 #endif
     server.supervised = 0;
     server.supervised_mode = SUPERVISED_NONE;
@@ -1695,7 +1695,7 @@ void initServerConfig(void) {
     server.commands = dictCreate(&commandTableDictType,NULL);
     server.orig_commands = dictCreate(&commandTableDictType,NULL);
     populateCommandTable();
-#ifdef TODIS
+#ifdef USE_ND
     server.aofSetCommand = lookupCommandByCString("aofset");
 #endif
     server.delCommand = lookupCommandByCString("del");
@@ -2029,13 +2029,13 @@ void initServer(void) {
 
     /* Create the Redis databases, and initialize other internal state. */
     for (j = 0; j < server.dbnum; j++) {
-#if defined(TODIS) && defined(USE_PMDK)
+#if defined(NDHEDIS) && defined(USE_PMDK)
         if (server.persistent) {
-            server.db[j].dict = dictCreate(&dbDictTypeTODIS, NULL);
+            server.db[j].dict = dictCreate(&dbDictTypeNDHEDIS, NULL);
             pm_type_root_type_id = TOID_TYPE_NUM(struct redis_pmem_root);
             pm_type_key_val_pair_PM = TOID_TYPE_NUM(struct key_val_pair_PM);
         }
-#elif !defined(TODIS) && defined(USE_PMDK)
+#elif !defined(NDHEDIS) && defined(USE_PMDK)
         if (server.persistent) {
             server.db[j].dict = dictCreate(&dbDictTypePM,NULL);
             pm_type_root_type_id = TOID_TYPE_NUM(struct redis_pmem_root);
@@ -2126,8 +2126,8 @@ void initServer(void) {
     slowlogInit();
     latencyMonitorInit();
     bioInit();
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, server successfully initiated.");
+#ifdef USE_ND
+    serverLog(LL_ND, "NDHEDIS, server successfully initiated.");
 #endif
 }
 
@@ -2262,7 +2262,7 @@ struct redisCommand *lookupCommandOrOriginal(sds name) {
 void propagate(struct redisCommand *cmd, int dbid, robj **argv, int argc,
                int flags)
 {
-#ifndef TODIS
+#ifndef NDHEDIS
     if (server.aof_state != AOF_OFF && flags & PROPAGATE_AOF)
         feedAppendOnlyFile(cmd,dbid,argv,argc);
 #endif
@@ -2564,7 +2564,7 @@ int processCommand(client *c) {
         }
     }
 
-#ifdef TODIS
+#ifdef USE_ND
     if (server.max_pmem_memory) {
         long long start_time_evict = ustime();
         freePmemMemoryIfNeeded();
@@ -2676,7 +2676,7 @@ int processCommand(client *c) {
             handleClientsBlockedOnLists();
     }
 
-#ifdef TODIS
+#ifdef USE_ND
     writeStatusLogs();
 #endif
     long long end_time = ustime();
@@ -2736,7 +2736,7 @@ int prepareForShutdown(int flags) {
         }
         /* Append only file: fsync() the AOF and exit */
         serverLog(LL_NOTICE,"Calling fsync() on the AOF file.");
-#ifdef TODIS
+#ifdef USE_ND
         aofFsyncWithFlushVictim(server.aof_fd);
 #else
         aof_fsync(server.aof_fd);
@@ -3609,7 +3609,7 @@ void evictionPoolPopulate(dict *sampledict, dict *keydict, struct evictionPoolEn
     if (samples != _samples) zfree(samples);
 }
 
-#ifdef TODIS
+#ifdef USE_ND
 /* This is an helper function for freeMemoryIfNeeded(), it is used in order
  * to populate the evictionPool with a few entries every time we want to
  * expire a key. Keys with idle time smaller than one of the current
@@ -3806,8 +3806,8 @@ int freeMemoryIfNeeded(void) {
 
                 sds bestkey = dictGetKey(bestde);
                 robj *keyobj = createStringObject(bestkey,sdslen(bestkey));
-#ifdef TODIS
-                propagateExpireTODIS(db, bestde);
+#ifdef USE_ND
+                propagateExpireNDHEDIS(db, bestde);
 #else
                 propagateExpire(db,keyobj);
 #endif
@@ -3851,7 +3851,7 @@ int freeMemoryIfNeeded(void) {
     return C_OK;
 }
 
-#ifdef TODIS
+#ifdef USE_ND
 int freePmemMemoryIfNeeded(void) {
     /* Compute how much pmem memory we need to free. */
     size_t pmem_used = pmem_used_memory();
@@ -3866,11 +3866,11 @@ int freePmemMemoryIfNeeded(void) {
     if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
         return C_ERR; /* We need to free pmem memory, but policy forbids. */
 
-    serverLog(LL_TODIS, "##############################");
-    serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
+    serverLog(LL_ND, "##############################");
+    serverLog(LL_ND, "NDHEDIS, pmem eviction is fired.");
 
     while (pmem_freed < pmem_tofree) {
-        serverLog(LL_TODIS, "TODIS, pmem freed: %zu, pmem tofree: %zu", pmem_freed, pmem_tofree);
+        serverLog(LL_ND, "NDHEDIS, pmem freed: %zu, pmem tofree: %zu", pmem_freed, pmem_tofree);
         int keys_freed = 0;
         dictEntry *victim_de = NULL;
         redisDb *db = NULL;
@@ -3907,20 +3907,20 @@ int freePmemMemoryIfNeeded(void) {
             if (db == NULL || victim_de == NULL) {
                 if (keys_freed)
                     continue;
-                serverLog(LL_TODIS, "TODIS_ERROR, Victim entry is not exist");
+                serverLog(LL_ND, "NDHEDIS_ERROR, Victim entry is not exist");
                 return C_ERR; /* Nothing to free... */
             }
 
             /* Finally remove the selected key. */
-            serverLog(LL_TODIS, "TODIS, start to replace eviction entry: %p", victim_de);
+            serverLog(LL_ND, "NDHEDIS, start to replace eviction entry: %p", victim_de);
 
             long long free_pmem_time_make_dram_key_val_start = ustime();
             sds bestkey = dictGetKey(victim_de);
             robj *bestval = (robj *) dictGetVal(victim_de);
 
             serverLog(
-                    LL_TODIS,
-                    "TODIS, eviction bestkey: %s, bestval: %s",
+                    LL_ND,
+                    "NDHEDIS, eviction bestkey: %s, bestval: %s",
                     (sds) bestkey,
                     (sds) bestval->ptr);
 
@@ -3928,8 +3928,8 @@ int freePmemMemoryIfNeeded(void) {
             robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
 
             serverLog(
-                    LL_TODIS,
-                    "TODIS, eviction dramkey: %s, dramval: %s",
+                    LL_ND,
+                    "NDHEDIS, eviction dramkey: %s, dramval: %s",
                     (sds) dramkey,
                     (sds) dramval->ptr);
 
@@ -3962,7 +3962,7 @@ int freePmemMemoryIfNeeded(void) {
 
             long long free_pmem_time_feed_dram_log_start = ustime();
             /* Evicts to aof logs. */
-            feedAppendOnlyFileTODIS(db, dramkeyobj, dramval);
+            feedAppendOnlyFileNDHEDIS(db, dramkeyobj, dramval);
             decrRefCount(dramkeyobj);
             long long free_pmem_time_feed_dram_log_end = ustime();
             server.free_pmem_time_feed_dram_log += free_pmem_time_feed_dram_log_end - free_pmem_time_feed_dram_log_start;
@@ -3978,8 +3978,8 @@ int freePmemMemoryIfNeeded(void) {
             evictPmemNodesToVictimList(victim_oids);
         } TX_ONABORT {
             serverLog(
-                    LL_TODIS,
-                    "TODIS_ERROR: evict pmem node to victim list failed (%s)",
+                    LL_ND,
+                    "NDHEDIS_ERROR: evict pmem node to victim list failed (%s)",
                     __func__);
         } TX_END
         zfree(victim_oids);
@@ -3987,14 +3987,14 @@ int freePmemMemoryIfNeeded(void) {
         server.free_pmem_time_pmem_eviction += free_pmem_time_pmem_eviction_end - free_pmem_time_pmem_eviction_start;
     }
 
-    serverLog(LL_TODIS, "##############################");
+    serverLog(LL_ND, "##############################");
     return C_OK;
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 void writeStatusLogs(void) {
-    serverLog(LL_TODIS, "TODIS, pmem memory used: %zu", pmem_used_memory());
+    serverLog(LL_ND, "NDHEDIS, pmem memory used: %zu", pmem_used_memory());
 }
 #endif
 
@@ -4188,8 +4188,8 @@ void loadDataFromDisk(void) {
     if (server.aof_state == AOF_ON) {
         if (loadAppendOnlyFile(server.aof_filename) == C_OK)
             serverLog(LL_NOTICE,"DB loaded from append only file: %.3f seconds",(float)(ustime()-start)/1000000);
-#ifdef TODIS
-            serverLog(LL_TODIS,"TODIS, DB loaded from append only file: %.3f seconds",(float)(ustime()-start)/1000000);
+#ifdef USE_ND
+            serverLog(LL_ND,"NDHEDIS, DB loaded from append only file: %.3f seconds",(float)(ustime()-start)/1000000);
 #endif
     } else {
         if (rdbLoad(server.rdb_filename) == C_OK) {
@@ -4524,27 +4524,27 @@ int main(int argc, char **argv) {
         if (server.pm_reconstruct_required) {
             long long start = ustime();
             int reconstruct_result = C_ERR;
-#ifndef TODIS
+#ifndef NDHEDIS
             reconstruct_result = pmemReconstruct();
 #else
             TX_BEGIN(server.pm_pool) {
-                reconstruct_result = pmemReconstructTODIS();
+                reconstruct_result = pmemReconstructNDHEDIS();
             } TX_ONABORT {
                 serverLog(
-                        LL_TODIS,
-                        "TODIS_ERROR, pmem reconstruct failed (%s)",
+                        LL_ND,
+                        "NDHEDIS_ERROR, pmem reconstruct failed (%s)",
                         __func__);
             } TX_END
 #endif
             if (reconstruct_result == C_OK) {
                 serverLog(LL_NOTICE,"DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
-#ifdef TODIS
-                serverLog(LL_TODIS,"TODIS, DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
+#ifdef USE_ND
+                serverLog(LL_ND,"NDHEDIS, DB loaded from PMEM: %.3f seconds",(float)(ustime()-start)/1000000);
 #endif
             } else if (errno != ENOENT) {
                 serverLog(LL_WARNING,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
-#ifdef TODIS
-                serverLog(LL_TODIS,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
+#ifdef USE_ND
+                serverLog(LL_ND,"Fatal error loading the DB from PMEM: %s. Exiting.",strerror(errno));
 #endif
                 exit(1);
             }

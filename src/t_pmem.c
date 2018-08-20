@@ -1,5 +1,5 @@
 #include "server.h"
-#ifdef TODIS
+#ifdef USE_ND
 #include "pmem.h"
 #include "obj.h"
 #include "libpmemobj.h"
@@ -54,7 +54,7 @@ void aofSetGenericCommand(client *c, int flags, robj *key, robj *val, robj *expi
         addReply(c, abort_reply ? abort_reply : shared.nullbulk);
         return;
     }
-#ifdef TODIS
+#ifdef USE_ND
     if (val->encoding == OBJ_ENCODING_INT) {
         char int_str_buf[1024];
         sprintf(int_str_buf, "%lld", val->ptr);
@@ -120,7 +120,7 @@ void aofSetCommand(client *c) {
 /*-----------------------------------------------------------------------------
  * Check PMEM / DRAM status command
  *----------------------------------------------------------------------------*/
-#ifdef TODIS
+#ifdef USE_ND
 void getPmemProcessTimeCommand(client *c) {
     void *replylen = addDeferredMultiBulkLength(c);
     unsigned long numreplies = 0;
@@ -173,7 +173,7 @@ void getPmemProcessTimeCommand(client *c) {
     setDeferredMultiBulkLength(c, replylen, numreplies);
 }
 #endif
-#ifdef TODIS
+#ifdef USE_ND
 void getPmemStatusCommand(client *c) {
     long long used_pmem_memory = (long long) pmem_used_memory();
     void *replylen = addDeferredMultiBulkLength(c);

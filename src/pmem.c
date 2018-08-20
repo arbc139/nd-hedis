@@ -61,10 +61,10 @@ int pmemReconstruct(void) {
     return C_OK;
 }
 
-#ifdef TODIS
-int pmemReconstructTODIS(void) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemReconstructTODIS START");
+#ifdef USE_ND
+int pmemReconstructNDHEDIS(void) {
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, pmemReconstructNDHEDIS START");
     TOID(struct redis_pmem_root) root;
     TOID(struct key_val_pair_PM) pmem_toid;
     struct key_val_pair_PM *pmem_obj;
@@ -93,12 +93,12 @@ int pmemReconstructTODIS(void) {
     }
     /* Flush append only file (hard call)
      * This will remove all victim list... */
-    forceFlushAppendOnlyFileTODIS();
+    forceFlushAppendOnlyFileNDHEDIS();
 
     /* Reconstruct pmem lists */
     pmem_toid = D_RO(root)->pe_first;
     if (TOID_IS_NULL(pmem_toid)) {
-        serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
+        serverLog(LL_ND, "NDHEDIS, pmemReconstruct END");
         return C_OK;
     }
     while (1) {
@@ -112,8 +112,8 @@ int pmemReconstructTODIS(void) {
         server.used_pmem_memory += sdsAllocSizePM(val);
         server.used_pmem_memory += sizeof(struct key_val_pair_PM);
         serverLog(
-                LL_TODIS,
-                "TODIS, pmemReconstruct reconstructed used_pmem_memory: %zu",
+                LL_ND,
+                "NDHEDIS, pmemReconstruct reconstructed used_pmem_memory: %zu",
                 server.used_pmem_memory);
 
         dictAddReconstructedPM(d, key, val);
@@ -123,7 +123,7 @@ int pmemReconstructTODIS(void) {
         pmem_toid = D_RO(pmem_toid)->pmem_list_next;
     }
 
-    serverLog(LL_TODIS, "TODIS, pmemReconstruct END");
+    serverLog(LL_ND, "NDHEDIS, pmemReconstruct END");
     return C_OK;
 }
 #endif
@@ -145,18 +145,18 @@ void pmemKVpairSet(void *key, void *val)
     return;
 }
 
-#ifdef TODIS
+#ifdef USE_ND
 void pmemKVpairSetRearrangeList(void *key, void *val)
 {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, pmemKVpairSetRearrangeList START");
     PMEMoid *pmem_oid_ptr;
 
     pmem_oid_ptr = sdsPMEMoidBackReference((sds)key);
     pmemRemoveFromPmemList(*pmem_oid_ptr);
     PMEMoid new_pmem_oid = pmemAddToPmemList(key, val);
     *pmem_oid_ptr = new_pmem_oid;
-    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList END");
+    serverLog(LL_ND, "NDHEDIS, pmemKVpairSetRearrangeList END");
     return;
 }
 #endif
@@ -164,8 +164,8 @@ void pmemKVpairSetRearrangeList(void *key, void *val)
 PMEMoid
 pmemAddToPmemList(void *key, void *val)
 {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemAddToPmemList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, pmemAddToPmemList START");
     PMEMoid key_oid;
     PMEMoid val_oid;
     PMEMoid pmem_oid;
@@ -185,10 +185,10 @@ pmemAddToPmemList(void *key, void *val)
     pmem_obj->val_oid = val_oid;
     pmem_toid.oid = pmem_oid;
 
-#ifdef TODIS
+#ifdef USE_ND
         serverLog(
-                LL_TODIS,
-                "TODIS, pmemAddToPmemList key_val_pair_PM size: %zu",
+                LL_ND,
+                "NDHEDIS, pmemAddToPmemList key_val_pair_PM size: %zu",
                 sizeof(struct key_val_pair_PM));
     server.used_pmem_memory += sizeof(struct key_val_pair_PM);
 #endif
@@ -210,17 +210,17 @@ pmemAddToPmemList(void *key, void *val)
     root->pe_first = pmem_toid;
     root->num_dict_entries++;
 
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, pmemAddFromPmemList END");
+#ifdef USE_ND
+    serverLog(LL_ND, "NDHEDIS, pmemAddFromPmemList END");
 #endif
     return pmem_oid;
 }
 
 void
 pmemRemoveFromPmemList(PMEMoid oid) {
-#ifdef TODIS
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemRemoveFromPmemList START");
+#ifdef USE_ND
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, pmemRemoveFromPmemList START");
 #endif
     TOID(struct key_val_pair_PM) pmem_toid;
     struct redis_pmem_root *root;
@@ -229,10 +229,10 @@ pmemRemoveFromPmemList(PMEMoid oid) {
 
     pmem_toid.oid = oid;
 
-#ifdef TODIS
+#ifdef USE_ND
         serverLog(
-                LL_TODIS,
-                "TODIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
+                LL_ND,
+                "NDHEDIS, pmemRemoveFromPmemList key_val_pair_PM size: %zu",
                 sizeof(struct key_val_pair_PM));
         server.used_pmem_memory -= sizeof(struct key_val_pair_PM);
 #endif
@@ -283,14 +283,14 @@ pmemRemoveFromPmemList(PMEMoid oid) {
     }
     TX_ADD_FIELD_DIRECT(root,num_dict_entries);
     root->num_dict_entries--;
-    serverLog(LL_TODIS, "TODIS, pmemRemovFromPmemList END");
+    serverLog(LL_ND, "NDHEDIS, pmemRemovFromPmemList END");
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, pmemUnlinkFromPmemList START");
     TOID(struct key_val_pair_PM) pmem_toid;
     struct redis_pmem_root *root;
 
@@ -339,13 +339,13 @@ PMEMoid pmemUnlinkFromPmemList(PMEMoid oid) {
     }
     TX_ADD_FIELD_DIRECT(root,num_dict_entries);
     root->num_dict_entries--;
-    serverLog(LL_TODIS, "TODIS, pmemUnlinkFromPmemList END");
+    serverLog(LL_ND, "NDHEDIS, pmemUnlinkFromPmemList END");
     return oid;
 
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 PMEMoid getPmemKvOid(uint64_t i) {
     TOID(struct redis_pmem_root) root;
     TOID(struct key_val_pair_PM) pmem_toid;
@@ -371,7 +371,7 @@ PMEMoid getPmemKvOid(uint64_t i) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 void knuthUniqNumberGenerator(int *numbers, const int size, const int range) {
     int size_iter = 0;
 
@@ -388,7 +388,7 @@ void knuthUniqNumberGenerator(int *numbers, const int size, const int range) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 /**
  * Getting best eviction PMEMoid function.
  * parameters
@@ -407,8 +407,8 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
     // useless loop...
     if (server.pmem_victim_count > num_pmem_entries) {
         serverLog(
-                LL_TODIS,
-                "TODIS_ERROR, Number of victim count is larger than pmem entries!");
+                LL_ND,
+                "NDHEDIS_ERROR, Number of victim count is larger than pmem entries!");
     }
 
     /* allkeys-random policy */
@@ -442,7 +442,7 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 PMEMoid getBestEvictionKeyPMEMoid(void) {
     TOID(struct redis_pmem_root) root;
     struct redis_pmem_root *root_obj;
@@ -472,7 +472,7 @@ PMEMoid getBestEvictionKeyPMEMoid(void) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 struct key_val_pair_PM *getBestEvictionPMObject(void) {
     PMEMoid victim_oid = getBestEvictionKeyPMEMoid();
 
@@ -483,7 +483,7 @@ struct key_val_pair_PM *getBestEvictionPMObject(void) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 sds getBestEvictionKeyPM(void) {
     struct key_val_pair_PM *victim_obj = getBestEvictionPMObject();
 
@@ -494,7 +494,7 @@ sds getBestEvictionKeyPM(void) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 struct key_val_pair_PM *getPMObjectFromOid(PMEMoid oid) {
     void *pmem_base_addr = (void *)server.pm_pool->addr;
 
@@ -505,7 +505,7 @@ struct key_val_pair_PM *getPMObjectFromOid(PMEMoid oid) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 sds getKeyFromPMObject(struct key_val_pair_PM *obj) {
     void *pmem_base_addr = (void *)server.pm_pool->addr;
 
@@ -516,7 +516,7 @@ sds getKeyFromPMObject(struct key_val_pair_PM *obj) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 sds getValFromPMObject(struct key_val_pair_PM *obj) {
     void *pmem_base_addr = (void *)server.pm_pool->addr;
 
@@ -527,24 +527,24 @@ sds getValFromPMObject(struct key_val_pair_PM *obj) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 sds getKeyFromOid(PMEMoid oid) {
     struct key_val_pair_PM *obj = getPMObjectFromOid(oid);
     return getKeyFromPMObject(obj);
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 sds getValFromOid(PMEMoid oid) {
     struct key_val_pair_PM *obj = getPMObjectFromOid(oid);
     return getValFromPMObject(obj);
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, evictPmemNodesToVictimList START");
     struct redis_pmem_root *root = pmemobj_direct(server.pm_rootoid.oid);
 
     TOID(struct key_val_pair_PM) start_toid = TOID_NULL(struct key_val_pair_PM);
@@ -557,7 +557,7 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
 
             /*PMEMoid victim_oid = victim_oids[i];*/
             /*if (OID_IS_NULL(victim_oid)) {*/
-                /*serverLog(LL_TODIS, "TODIS_ERROR, victim_oid is null");*/
+                /*serverLog(LL_ND, "NDHEDIS_ERROR, victim_oid is null");*/
                 /*return C_ERR;*/
             /*}*/
 
@@ -588,13 +588,13 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
             /*TX_ADD_DIRECT(root);*/
             /*root->victim_start = start;*/
 
-            /*serverLog(LL_TODIS, "TODIS, victim key: %s", getKeyFromOid(victim_oid));*/
+            /*serverLog(LL_ND, "NDHEDIS, victim key: %s", getKeyFromOid(victim_oid));*/
 
             /*[> Unlinks victim node from PMEM list. <]*/
             /*pmemUnlinkFromPmemList(victim_oid);*/
             /*victim_obj->pmem_list_next = victim_legacy_root_toid;*/
         /*}*/
-        serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList RANDOM END");
+        serverLog(LL_ND, "NDHEDIS, evictPmemNodesToVictimList RANDOM END");
         return C_ERR;
     }
     else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU) {
@@ -609,7 +609,7 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
             }
         }
         if (OID_IS_NULL(start_oid)) {
-            serverLog(LL_TODIS, "TODIS_CRITICAL_ERROR, all of victim oids is null");
+            serverLog(LL_ND, "NDHEDIS_CRITICAL_ERROR, all of victim oids is null");
             return C_ERR;
         }
         start_toid.oid = start_oid;
@@ -621,7 +621,7 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
             root->pe_first = TOID_NULL(struct key_val_pair_PM);
         }
 
-        serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList LRU END");
+        serverLog(LL_ND, "NDHEDIS, evictPmemNodesToVictimList LRU END");
         return C_OK;
     }
 
@@ -629,17 +629,17 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 int evictPmemNodeToVictimList(PMEMoid victim_oid) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, evictPmemNodeToVictimList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, evictPmemNodeToVictimList START");
     TOID(struct key_val_pair_PM) victim_toid;
     TOID(struct key_val_pair_PM) victim_legacy_root_toid;
     struct redis_pmem_root *root;
     struct key_val_pair_PM *victim_obj;
 
     if (OID_IS_NULL(victim_oid)) {
-        serverLog(LL_TODIS, "TODIS_ERROR, victim_oid is null");
+        serverLog(LL_ND, "NDHEDIS_ERROR, victim_oid is null");
         return C_ERR;
     }
 
@@ -659,17 +659,17 @@ int evictPmemNodeToVictimList(PMEMoid victim_oid) {
     root->victim_first = victim_toid;
     root->num_victim_entries++;
 
-    serverLog(LL_TODIS, "TODIS, victim key: %s", getKeyFromOid(victim_oid));
+    serverLog(LL_ND, "NDHEDIS, victim key: %s", getKeyFromOid(victim_oid));
 
     /* Unlinks victim node from PMEM list. */
     pmemUnlinkFromPmemList(victim_oid);
     victim_obj->pmem_list_next = victim_legacy_root_toid;
-    serverLog(LL_TODIS, "TODIS, evictPmemNodeToVictimList END");
+    serverLog(LL_ND, "NDHEDIS, evictPmemNodeToVictimList END");
     return C_OK;
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 void freeVictim(PMEMoid oid) {
     sds key = getKeyFromOid(oid);
     sds val = getValFromOid(oid);
@@ -678,10 +678,10 @@ void freeVictim(PMEMoid oid) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 void freeVictimList(PMEMoid start_oid) {
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, freeVictimList START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, freeVictimList START");
     struct redis_pmem_root *root;
 
     root = pmemobj_direct(server.pm_rootoid.oid);
@@ -689,7 +689,7 @@ void freeVictimList(PMEMoid start_oid) {
     victim_first_toid.oid = start_oid;
 
     if (OID_IS_NULL(start_oid)) {
-        serverLog(LL_TODIS, "TODIS, freeVictimList END");
+        serverLog(LL_ND, "NDHEDIS, freeVictimList END");
         return;
     }
 
@@ -713,17 +713,17 @@ void freeVictimList(PMEMoid start_oid) {
         root->num_victim_entries--;
         victim_first_toid = next_toid;
     }
-    serverLog(LL_TODIS, "TODIS, freeVictimList END");
+    serverLog(LL_ND, "NDHEDIS, freeVictimList END");
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 size_t pmem_used_memory(void) {
     return server.used_pmem_memory;
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 size_t sizeOfPmemNode(PMEMoid oid) {
     size_t total_size = 0;
 
@@ -735,15 +735,15 @@ size_t sizeOfPmemNode(PMEMoid oid) {
     total_size += sdsAllocSizePM(val);
     total_size += node_size;
     serverLog(
-            LL_TODIS,
-            "TODIS, sizeOfPmemNode: %zu",
+            LL_ND,
+            "NDHEDIS, sizeOfPmemNode: %zu",
             total_size);
 
     return total_size;
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 struct redis_pmem_root *getPmemRootObject(void) {
     return pmemobj_direct(server.pm_rootoid.oid);
 }

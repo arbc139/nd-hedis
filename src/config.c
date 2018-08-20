@@ -53,7 +53,7 @@ configEnum maxmemory_policy_enum[] = {
     {NULL, 0}
 };
 
-#ifdef TODIS
+#ifdef USE_ND
 configEnum max_pmem_memory_policy_enum[] = {
     {"volatile-lru", MAXMEMORY_VOLATILE_LRU},
     {"volatile-random",MAXMEMORY_VOLATILE_RANDOM},
@@ -83,8 +83,8 @@ configEnum loglevel_enum[] = {
     {"verbose", LL_VERBOSE},
     {"notice", LL_NOTICE},
     {"warning", LL_WARNING},
-#ifdef TODIS
-    {"todis", LL_TODIS},
+#ifdef USE_ND
+    {"nd_only", LL_ND},
 #endif
     {NULL,0}
 };
@@ -266,12 +266,12 @@ void loadServerConfigFromString(char *config) {
                       "Must be one of debug, verbose, notice, warning";
                 goto loaderr;
             }
-#ifdef TODIS
-        } else if (!strcasecmp(argv[0],"todis-log-only") && argc == 2) {
-            if ((server.todis_log_only = yesnotoi(argv[1])) == -1) {
+#ifdef USE_ND
+        } else if (!strcasecmp(argv[0],"verbosity-nd-only") && argc == 2) {
+            if ((server.verbosity_nd_only = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
             }
-            serverLog(LL_WARNING, "TODIS, server todis log: %d", server.todis_log_only);
+            serverLog(LL_WARNING, "NDHEDIS, server ndhedis log: %d", server.verbosity_nd_only);
 #endif
         } else if (!strcasecmp(argv[0],"logfile") && argc == 2) {
             FILE *logfp;
@@ -324,7 +324,7 @@ void loadServerConfigFromString(char *config) {
                 err = "Invalid maxmemory policy";
                 goto loaderr;
             }
-#ifdef TODIS
+#ifdef USE_ND
         } else if (!strcasecmp(argv[0], "max-pmem-memory-policy") && argc == 2) {
             server.max_pmem_memory_policy =
                 configEnumGetValue(max_pmem_memory_policy_enum, argv[1]);
@@ -333,7 +333,7 @@ void loadServerConfigFromString(char *config) {
                 goto loaderr;
             }
 #endif
-#ifdef TODIS
+#ifdef USE_ND
         } else if (!strcasecmp(argv[0], "pmem-victim-count") && argc == 2) {
             long long pmem_victim_count = atoi(argv[1]);
             if (pmem_victim_count < CONFIG_MIN_PMEM_VICTIM_COUNT) {
@@ -437,7 +437,7 @@ void loadServerConfigFromString(char *config) {
             }
             server.pm_file_size = size;
 #endif
-#ifdef TODIS
+#ifdef USE_ND
         } else if (!strcasecmp(argv[0],"max_pmem_memory") && (argc == 2)) {
             long long max_pmem_memory = memtoll(argv[1],NULL);
             if (max_pmem_memory < CONFIG_MIN_MAX_PMEM_MEMORY_SIZE) {
@@ -937,9 +937,9 @@ void configSetCommand(client *c) {
 
     /* Boolean fields.
      * config_set_bool_field(name,var). */
-#ifdef TODIS
+#ifdef USE_ND
     } config_set_bool_field(
-      "todis-log-only", server.todis_log_only) {
+      "verbosity-nd-only", server.verbosity_nd_only) {
 #endif
     } config_set_bool_field(
       "rdbcompression", server.rdb_compression) {
@@ -1059,7 +1059,7 @@ void configSetCommand(client *c) {
       "loglevel",server.verbosity,loglevel_enum) {
     } config_set_enum_field(
       "maxmemory-policy",server.maxmemory_policy,maxmemory_policy_enum) {
-#ifdef TODIS
+#ifdef USE_ND
     } config_set_enum_field(
       "max-pmem-memory-policy",
       server.max_pmem_memory_policy,
@@ -1191,9 +1191,9 @@ void configGetCommand(client *c) {
     config_get_numerical_field("tcp-keepalive",server.tcpkeepalive);
 
     /* Bool (yes/no) values */
-#ifdef TODIS
-    config_get_bool_field("todis-log-only",
-            server.todis_log_only);
+#ifdef USE_ND
+    config_get_bool_field("verbosity-nd-only",
+            server.verbosity_nd_only);
 #endif
     config_get_bool_field("cluster-require-full-coverage",
             server.cluster_require_full_coverage);
@@ -1222,7 +1222,7 @@ void configGetCommand(client *c) {
     /* Enum values */
     config_get_enum_field("maxmemory-policy",
             server.maxmemory_policy,maxmemory_policy_enum);
-#ifdef TODIS
+#ifdef USE_ND
     config_get_enum_field("max-pmem-memory-policy",
             server.max_pmem_memory_policy, max_pmem_memory_policy_enum);
 #endif
@@ -1891,8 +1891,8 @@ int rewriteConfig(char *path) {
     rewriteConfigBytesOption(state,"repl-backlog-size",server.repl_backlog_size,CONFIG_DEFAULT_REPL_BACKLOG_SIZE);
     rewriteConfigBytesOption(state,"repl-backlog-ttl",server.repl_backlog_time_limit,CONFIG_DEFAULT_REPL_BACKLOG_TIME_LIMIT);
     rewriteConfigYesNoOption(state,"repl-disable-tcp-nodelay",server.repl_disable_tcp_nodelay,CONFIG_DEFAULT_REPL_DISABLE_TCP_NODELAY);
-#ifdef TODIS
-    rewriteConfigYesNoOption(state,"todis-log-only",server.todis_log_only,CONFIG_DEFAULT_TODIS_LOG_ONLY);
+#ifdef USE_ND
+    rewriteConfigYesNoOption(state,"verbosity-nd-only",server.verbosity_nd_only,CONFIG_DEFAULT_NDHEDIS_LOG_ONLY);
 #endif
     rewriteConfigYesNoOption(state,"repl-diskless-sync",server.repl_diskless_sync,CONFIG_DEFAULT_REPL_DISKLESS_SYNC);
     rewriteConfigNumericalOption(state,"repl-diskless-sync-delay",server.repl_diskless_sync_delay,CONFIG_DEFAULT_REPL_DISKLESS_SYNC_DELAY);
@@ -1903,7 +1903,7 @@ int rewriteConfig(char *path) {
     rewriteConfigNumericalOption(state,"maxclients",server.maxclients,CONFIG_DEFAULT_MAX_CLIENTS);
     rewriteConfigBytesOption(state,"maxmemory",server.maxmemory,CONFIG_DEFAULT_MAXMEMORY);
     rewriteConfigEnumOption(state,"maxmemory-policy",server.maxmemory_policy,maxmemory_policy_enum,CONFIG_DEFAULT_MAXMEMORY_POLICY);
-#ifdef TODIS
+#ifdef USE_ND
     rewriteConfigEnumOption(state, "max-pmem-memory-policy", server.max_pmem_memory_policy, max_pmem_memory_policy_enum, CONFIG_DEFAULT_MAXMEMORY_POLICY);
 #endif
     rewriteConfigNumericalOption(state,"maxmemory-samples",server.maxmemory_samples,CONFIG_DEFAULT_MAXMEMORY_SAMPLES);

@@ -40,7 +40,7 @@
 #include <sys/wait.h>
 #include <sys/param.h>
 
-#ifdef TODIS
+#ifdef USE_ND
 #include "pmem.h"
 #endif
 
@@ -210,15 +210,15 @@ void aof_background_fsync(int fd) {
             NULL);
 }
 
-#ifdef TODIS
-void aof_background_fsync_TODIS(int fd) {
+#ifdef USE_ND
+void aof_background_fsync_NDHEDIS(int fd) {
     PMEMoid *victim_first_ptr = zmalloc(sizeof(PMEMoid));
     TX_BEGIN(server.pm_pool) {
         struct redis_pmem_root *root;
         root = pmemobj_direct(server.pm_rootoid.oid); 
         *victim_first_ptr = root->victim_first.oid;
     } TX_ONABORT {
-        serverLog(LL_TODIS, "TODIS_ERROR, getting root failed");
+        serverLog(LL_ND, "NDHEDIS_ERROR, getting root failed");
     } TX_END
 
     bioCreateBackgroundJob(
@@ -229,14 +229,14 @@ void aof_background_fsync_TODIS(int fd) {
 }
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 void aofFsyncWithFlushVictim(int fd) {
     aof_fsync(fd);
     TX_BEGIN(server.pm_pool) {
         struct redis_pmem_root *root = getPmemRootObject();
         freeVictimList(root->victim_first.oid);
     } TX_ONABORT {
-        serverLog(LL_TODIS, "TODIS_ERROR, free victim list failed: (%s)", __func__);
+        serverLog(LL_ND, "NDHEDIS_ERROR, free victim list failed: (%s)", __func__);
     } TX_END
 }
 #endif
@@ -246,7 +246,7 @@ void aofFsyncWithFlushVictim(int fd) {
 void stopAppendOnly(void) {
     serverAssert(server.aof_state != AOF_OFF);
     flushAppendOnlyFile(1);
-#ifdef TODIS
+#ifdef USE_ND
     aofFsyncWithFlushVictim(server.aof_fd);
 #else
     aof_fsync(server.aof_fd);
@@ -478,7 +478,7 @@ void flushAppendOnlyFile(int force) {
         /* aof_fsync is defined as fdatasync() for Linux in order to avoid
          * flushing metadata. */
         latencyStartMonitor(latency);
-#ifdef TODIS
+#ifdef USE_ND
         aofFsyncWithFlushVictim(server.aof_fd);
 #else
         aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
@@ -489,27 +489,27 @@ void flushAppendOnlyFile(int force) {
     } else if ((server.aof_fsync == AOF_FSYNC_EVERYSEC &&
                 server.unixtime > server.aof_last_fsync)) {
         if (!sync_in_progress) {
-#ifdef TODIS
-            aof_background_fsync_TODIS(server.aof_fd); 
+#ifdef USE_ND
+            aof_background_fsync_NDHEDIS(server.aof_fd); 
 #else
             aof_background_fsync(server.aof_fd);
 #endif
         }
         server.aof_last_fsync = server.unixtime;
     }
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, flushAppendOnlyFile FIRED");
+#ifdef USE_ND
+    serverLog(LL_ND, "NDHEDIS, flushAppendOnlyFile FIRED");
 #endif
 }
 
-#ifdef TODIS
-void forceFlushAppendOnlyFileTODIS(void) {
+#ifdef USE_ND
+void forceFlushAppendOnlyFileNDHEDIS(void) {
     if (server.aof_fsync == AOF_FSYNC_ALWAYS) {
         /* Let's try to get this data on the disk */
         aofFsyncWithFlushVictim(server.aof_fd);
         server.aof_last_fsync = server.unixtime;
     } else if (server.aof_fsync == AOF_FSYNC_EVERYSEC) {
-        aof_background_fsync_TODIS(server.aof_fd);
+        aof_background_fsync_NDHEDIS(server.aof_fd);
         server.aof_last_fsync = server.unixtime;
     }
 }
@@ -627,18 +627,18 @@ void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int a
     sdsfree(buf);
 }
 
-#ifdef TODIS
+#ifdef USE_ND
 /**
- * feedAppendOnlyFileTODIS
- * AOF feed implementation for TODIS.
+ * feedAppendOnlyFileNDHEDIS
+ * AOF feed implementation for NDHEDIS.
  * DB: target DB.
  * key: Evicted DRAM key
  * val: Evicted DRAM val
  */
-void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
+void feedAppendOnlyFileNDHEDIS(redisDb *db, robj *key, robj *val) {
     robj *argv[3];
-    serverLog(LL_TODIS, "   ");
-    serverLog(LL_TODIS, "TODIS, feedAppendOnlyFile START");
+    serverLog(LL_ND, "   ");
+    serverLog(LL_ND, "NDHEDIS, feedAppendOnlyFile START");
 
     argv[0] = createStringObject("AOFSET", 6);
     argv[1] = key;
@@ -646,16 +646,16 @@ void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val) {
     incrRefCount(argv[1]);
     incrRefCount(argv[2]);
 
-    serverLog(LL_TODIS, "TODIS, command: %s", (char *) argv[0]->ptr);
-    serverLog(LL_TODIS, "TODIS, key: %s", (sds) argv[1]->ptr);
-    serverLog(LL_TODIS, "TODIS, value: %s", (sds) argv[2]->ptr);
+    serverLog(LL_ND, "NDHEDIS, command: %s", (char *) argv[0]->ptr);
+    serverLog(LL_ND, "NDHEDIS, key: %s", (sds) argv[1]->ptr);
+    serverLog(LL_ND, "NDHEDIS, value: %s", (sds) argv[2]->ptr);
 
     feedAppendOnlyFile(server.aofSetCommand, db->id, argv, 3);
 
     decrRefCount(argv[0]);
     decrRefCount(argv[1]);
     decrRefCount(argv[2]);
-    serverLog(LL_TODIS, "TODIS, feedAppendOnlyFile END");
+    serverLog(LL_ND, "NDHEDIS, feedAppendOnlyFile END");
 }
 #endif
 
@@ -712,8 +712,8 @@ void freeFakeClient(struct client *c) {
  * error (the append only file is zero-length) C_ERR is returned. On
  * fatal error an error message is logged and the program exists. */
 int loadAppendOnlyFile(char *filename) {
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, loadAppendOnlyFile START");
+#ifdef USE_ND
+    serverLog(LL_ND, "NDHEDIS, loadAppendOnlyFile START");
 #endif
     struct client *fakeClient;
     FILE *fp = fopen(filename,"r");
@@ -824,8 +824,8 @@ loaded_ok: /* DB loaded, cleanup and return C_OK to the caller. */
     stopLoading();
     aofUpdateCurrentSize();
     server.aof_rewrite_base_size = server.aof_current_size;
-#ifdef TODIS
-    serverLog(LL_TODIS, "TODIS, loadAppendOnlyFile END");
+#ifdef USE_ND
+    serverLog(LL_ND, "NDHEDIS, loadAppendOnlyFile END");
 #endif
     return C_OK;
 
@@ -1560,14 +1560,14 @@ void backgroundRewriteDoneHandler(int exitcode, int bysignal) {
             oldfd = server.aof_fd;
             server.aof_fd = newfd;
             if (server.aof_fsync == AOF_FSYNC_ALWAYS)
-#ifdef TODIS
+#ifdef USE_ND
                 aofFsyncWithFlushVictim(newfd);
 #else
                 aof_fsync(newfd);
 #endif
             else if (server.aof_fsync == AOF_FSYNC_EVERYSEC) {
-#ifdef TODIS
-                aof_background_fsync_TODIS(newfd);
+#ifdef USE_ND
+                aof_background_fsync_NDHEDIS(newfd);
 #else
                 aof_background_fsync(newfd);
 #endif

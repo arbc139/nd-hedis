@@ -267,7 +267,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen);
 void sdsIncrLen(sds s, int incr);
 sds sdsRemoveFreeSpace(sds s);
 size_t sdsAllocSize(sds s);
-#ifdef TODIS
+#ifdef USE_ND
 size_t sdsAllocSizePM(sds s);
 void sdsfreeVictim(sds s);
 #endif

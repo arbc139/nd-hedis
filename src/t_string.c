@@ -91,7 +91,7 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         int error = 0;
         robj *convertedVal = val;
 
-#ifdef TODIS
+#ifdef USE_ND
         if (val->encoding == OBJ_ENCODING_INT) {
             char int_str_buf[1024];
             sprintf(int_str_buf, "%lld", val->ptr);

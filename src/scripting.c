@@ -780,8 +780,8 @@ int luaLogCommand(lua_State *lua) {
         return lua_error(lua);
     }
     level = lua_tonumber(lua,-argc);
-#ifdef TODIS
-    if (level < LL_DEBUG || level > LL_TODIS) {
+#ifdef USE_ND
+    if (level < LL_DEBUG || level > LL_ND) {
         lua_pushstring(lua, "Invalid debug level.");
         return lua_error(lua);
     }
@@ -953,9 +953,9 @@ void scriptingInit(int setup) {
     lua_pushnumber(lua,LL_WARNING);
     lua_settable(lua,-3);
 
-#ifdef TODIS
-    lua_pushstring(lua, "LOG_TODIS");
-    lua_pushnumber(lua,LL_TODIS);
+#ifdef USE_ND
+    lua_pushstring(lua, "LOG_NDHEDIS");
+    lua_pushnumber(lua,LL_ND);
     lua_settable(lua, -3);
 #endif
 

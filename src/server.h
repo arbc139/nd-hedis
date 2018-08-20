@@ -84,7 +84,7 @@ struct redis_pmem_root {
 
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 #define LOCATION_DRAM 0
 #define LOCATION_PMEM 1
 #endif
@@ -187,10 +187,10 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CONFIG_DEFAULT_PM_FILE_SIZE (1024*1024*1024) /* 1GB */
 #endif
 
-#ifdef TODIS
+#ifdef USE_ND
 #define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024 /* 1KB */
 #define CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE CONFIG_MIN_MAX_PMEM_MEMORY_SIZE
-#define CONFIG_DEFAULT_TODIS_LOG_ONLY 0
+#define CONFIG_DEFAULT_NDHEDIS_LOG_ONLY 0
 #define CONFIG_MIN_PMEM_VICTIM_COUNT 1
 #endif
 
@@ -392,8 +392,8 @@ typedef long long mstime_t; /* millisecond time type. */
 #define SORT_OP_GET 0
 
 /* Log levels */
-#ifdef TODIS
-#define LL_TODIS 0
+#ifdef USE_ND
+#define LL_ND 0
 #define LL_DEBUG 1
 #define LL_VERBOSE 2
 #define LL_NOTICE 3
@@ -815,7 +815,7 @@ struct redisServer {
     /* Fast pointers to often looked up command */
     struct redisCommand *delCommand, *multiCommand, *lpushCommand, *lpopCommand,
                         *rpopCommand, *sremCommand, *execCommand;
-#ifdef TODIS
+#ifdef USE_ND
     struct redisCommand *aofSetCommand;
 #endif
     /* Fields used only for stats */
@@ -869,7 +869,7 @@ struct redisServer {
     TOID(struct redis_pmem_root) pm_rootoid; /*PMEM root object OID*/
     uint64_t pool_uuid_lo;          /* PMEM pool UUID */
 #endif
-#ifdef TODIS
+#ifdef USE_ND
     long long process_time;         /* TEMP: time checking for process command */
     long long pmem_list_time;       /* TEMP: time checking for pmem list */
     long long free_pmem_time_find_victim_key;
@@ -883,7 +883,7 @@ struct redisServer {
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
     int max_pmem_memory_policy;     /* Policy for key eviction */
     size_t pmem_victim_count;       /* Number of Victim in eviction */
-    int todis_log_only;             /* Force to write todis log only */
+    int verbosity_nd_only;             /* Force to write nd-hedis log only */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
@@ -1363,10 +1363,10 @@ void stopLoading(void);
 /* AOF persistence */
 void flushAppendOnlyFile(int force);
 void feedAppendOnlyFile(struct redisCommand *cmd, int dictid, robj **argv, int argc);
-#ifdef TODIS
+#ifdef USE_ND
 void aofFsyncWithFlushVictim(int fd);
-void feedAppendOnlyFileTODIS(redisDb *db, robj *key, robj *val);
-void forceFlushAppendOnlyFileTODIS();
+void feedAppendOnlyFileNDHEDIS(redisDb *db, robj *key, robj *val);
+void forceFlushAppendOnlyFileNDHEDIS();
 #endif
 void aofRemoveTempFile(pid_t childpid);
 int rewriteAppendOnlyFileBackground(void);
@@ -1409,7 +1409,7 @@ unsigned long zslGetRank(zskiplist *zsl, double score, robj *o);
 
 /* Core functions */
 int freeMemoryIfNeeded(void);
-#ifdef TODIS
+#ifdef USE_ND
 int freePmemMemoryIfNeeded(void);
 void writeStatusLogs(void);
 #endif
@@ -1508,9 +1508,9 @@ int rewriteConfig(char *path);
 /* db.c -- Keyspace access API */
 int removeExpire(redisDb *db, robj *key);
 void propagateExpire(redisDb *db, robj *key);
-#ifdef TODIS
+#ifdef USE_ND
 int dbReconstructVictim(redisDb *db, robj *key, robj *val);
-void propagateExpireTODIS(redisDb *db, dictEntry *entry);
+void propagateExpireNDHEDIS(redisDb *db, dictEntry *entry);
 #endif
 int expireIfNeeded(redisDb *db, robj *key);
 long long getExpire(redisDb *db, robj *key);
@@ -1521,7 +1521,7 @@ robj *lookupKeyWrite(redisDb *db, robj *key);
 robj *lookupKeyReadOrReply(client *c, robj *key, robj *reply);
 robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply);
 robj *lookupKeyReadWithFlags(redisDb *db, robj *key, int flags);
-#ifdef TODIS
+#ifdef USE_ND
 dictEntry *lookupKeyWriteEntry(redisDb *db, robj *key);
 dictEntry *lookupKeyEntry(redisDb *db, robj *key);
 #endif
@@ -1768,7 +1768,7 @@ void pfmergeCommand(client *c);
 void pfdebugCommand(client *c);
 void latencyCommand(client *c);
 void securityWarningCommand(client *c);
-#ifdef TODIS
+#ifdef USE_ND
 void aofSetCommand(client *c);
 void getPmemProcessTimeCommand(client *c);
 void getPmemStatusCommand(client *c);
