@@ -1,6 +1,6 @@
 # nd-hedis
 
-NVM-DRAM Hybrid redis. \
+NVM-DRAM Hybrid Redis. \
 Implemented by totorody.
 
 -------------
