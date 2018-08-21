@@ -4,7 +4,6 @@
 #include "obj.h"
 #include "libpmemobj.h"
 #include "util.h"
-#include "pmem_latency.h"
 #endif
 #include <math.h> /* isnan(), isinf() */
 
@@ -266,7 +265,7 @@ void getListPmemStatusCommand(client *c) {
 
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
-    node_toid = D_RO_LATENCY(root)->pe_first;
+    node_toid = D_RO(root)->pe_first;
     if (TOID_IS_NULL(node_toid)) {
         setDeferredMultiBulkLength(c, replylen, numreplies);
         return;
@@ -282,10 +281,10 @@ void getListPmemStatusCommand(client *c) {
         addReplyBulkCString(c, str_buf);
         numreplies++;
 
-        if (TOID_EQUALS(node_toid, D_RO_LATENCY(root)->pe_last))
+        if (TOID_EQUALS(node_toid, D_RO(root)->pe_last))
             break;
 
-        node_toid = D_RO_LATENCY(node_toid)->pmem_list_next;
+        node_toid = D_RO(node_toid)->pmem_list_next;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
@@ -304,7 +303,7 @@ void getReverseListPmemStatusCommand(client *c) {
 
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
-    node_toid = D_RO_LATENCY(root)->pe_last;
+    node_toid = D_RO(root)->pe_last;
     if (TOID_IS_NULL(node_toid)) {
         setDeferredMultiBulkLength(c, replylen, numreplies);
         return;
@@ -320,10 +319,10 @@ void getReverseListPmemStatusCommand(client *c) {
         addReplyBulkCString(c, str_buf);
         numreplies++;
 
-        if (TOID_EQUALS(node_toid, D_RO_LATENCY(root)->pe_first))
+        if (TOID_EQUALS(node_toid, D_RO(root)->pe_first))
             break;
 
-        node_toid = D_RO_LATENCY(node_toid)->pmem_list_prev;
+        node_toid = D_RO(node_toid)->pmem_list_prev;
     }
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
@@ -342,9 +341,9 @@ void getListVictimStatusCommand(client *c) {
 
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
-    for (victim_toid = D_RO_LATENCY(root)->victim_first;
+    for (victim_toid = D_RO(root)->victim_first;
         TOID_IS_NULL(victim_toid) == 0;
-        victim_toid = D_RO_LATENCY(victim_toid)->pmem_list_next
+        victim_toid = D_RO(victim_toid)->pmem_list_next
     ) {
         victim_obj = (key_val_pair_PM *)(victim_toid.oid.off + (uint64_t) pmem_base_addr);
         key = (void *)(victim_obj->key_oid.off + (uint64_t) pmem_base_addr);

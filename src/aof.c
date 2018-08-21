@@ -42,7 +42,6 @@
 
 #ifdef USE_ND
 #include "pmem.h"
-#include "pmem_latency.h"
 #endif
 
 void aofUpdateCurrentSize(void);
@@ -216,7 +215,7 @@ void aof_background_fsync_NDHEDIS(int fd) {
     PMEMoid *victim_first_ptr = zmalloc(sizeof(PMEMoid));
     TX_BEGIN(server.pm_pool) {
         struct redis_pmem_root *root;
-        root = pmemobj_direct_latency(server.pm_rootoid.oid);
+        root = pmemobj_direct(server.pm_rootoid.oid); 
         *victim_first_ptr = root->victim_first.oid;
     } TX_ONABORT {
         serverLog(LL_ND, "NDHEDIS_ERROR, getting root failed");

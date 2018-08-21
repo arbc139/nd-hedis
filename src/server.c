@@ -33,10 +33,6 @@
 #include "bio.h"
 #include "latency.h"
 
-#ifdef USE_ND
-#include "pmem_latency.h"
-#endif
-
 #include <time.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -4375,7 +4371,7 @@ void initPersistentMemory(void) {
         }
     } else {
         server.pm_rootoid = POBJ_ROOT(server.pm_pool, struct redis_pmem_root);
-        root = pmemobj_direct_latency(server.pm_rootoid.oid);
+        root = pmemobj_direct(server.pm_rootoid.oid);
         root->num_dict_entries = 0;
         root->num_victim_entries = 0;
     }
