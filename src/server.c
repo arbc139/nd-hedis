@@ -411,6 +411,31 @@ err:
     if (!log_to_stdout) close(fd);
 }
 
+/* Return the UNIX time in nanoseconds */
+struct timespec nstimespec(void) {
+    struct timespec spec;
+    clock_gettime(CLOCK_REALTIME, &spec);
+    return spec;
+}
+
+int nstimeCompare(const struct timespec a, const struct timespec b) {
+    if (a.tv_sec != b.tv_sec) {
+        if (a.tv_sec > b.tv_sec) {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    if (a.tv_nsec > b.tv_nsec) {
+        return 1;
+    } else if (a.tv_nsec < b.tv_nsec) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 /* Return the UNIX time in microseconds */
 long long ustime(void) {
     struct timeval tv;
