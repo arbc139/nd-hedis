@@ -4,7 +4,7 @@ NVM-DRAM Hybrid Redis (ND-Hedis) \
 Implemented by totorody.
 
 ## To build ND-Hedis with PMDK run command
-    % make USE_PMDK=yes USE_ND=yes STD=-std=gnu99
+    % make USE_PMDK=yes TODIS=yes STD=-std=gnu99
 
 ## Run ND-Hedis server (root)
     % PMEM_IS_PMEM_FORCE=1 ./src/redis-server ${some-configuration-file}

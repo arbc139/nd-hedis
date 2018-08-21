@@ -169,7 +169,7 @@ static void _dictReset(dictht *ht)
     ht->size = 0;
     ht->sizemask = 0;
     ht->used = 0;
-#ifdef USE_ND
+#ifdef TODIS
     ht->pmem_used = 0;
 #endif
 }
@@ -230,7 +230,7 @@ int dictExpand(dict *d, unsigned long size)
     n.sizemask = realsize-1;
     n.table = zcalloc(realsize*sizeof(dictEntry*));
     n.used = 0;
-#ifdef USE_ND
+#ifdef TODIS
     n.pmem_used = 0;
 #endif
 
@@ -282,7 +282,7 @@ int dictRehash(dict *d, int n) {
             d->ht[1].table[h] = de;
             d->ht[0].used--;
             d->ht[1].used++;
-#ifdef USE_ND
+#ifdef TODIS
             if (de->location == LOCATION_PMEM) {
                 d->ht[0].pmem_used--;
                 d->ht[1].pmem_used++;
@@ -345,8 +345,8 @@ int dictAdd(dict *d, void *key, void *val)
 
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
-#ifdef USE_ND
-    serverLog(LL_ND, "NDHEDIS, dictAdd key: %s, val: %s", key, ((robj *)val)->ptr);
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAdd key: %s, val: %s", key, ((robj *)val)->ptr);
 #endif
     return DICT_OK;
 }
@@ -360,8 +360,8 @@ int dictAddPM(dict *d, void *key, void *val)
     if (!entry) return DICT_ERR;
     dictSetVal(d, entry, val);
 
-#ifdef USE_ND
-    serverLog(LL_ND, "NDHEDIS, dictAddPM key: %s, val: %s", key, ((robj *)val)->ptr);
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAddPM key: %s, val: %s", key, ((robj *)val)->ptr);
 #endif
 
     return DICT_OK;
@@ -406,7 +406,7 @@ dictEntry *dictAddRaw(dict *d, void *key)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
-#ifdef USE_ND
+#ifdef TODIS
     entry->location = LOCATION_DRAM;
 #endif
 
@@ -455,10 +455,10 @@ dictEntry *dictAddRawPM(dict *d, void *key)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
-#ifdef USE_ND
+#ifdef TODIS
     ht->pmem_used++;
     entry->location = LOCATION_PMEM;
-    serverLog(LL_ND, "NDHEDIS, dictAddRawPM pmem used: %ld", ht->pmem_used);
+    serverLog(LL_TODIS, "TODIS, dictAddRawPM pmem used: %ld", ht->pmem_used);
 #endif
 
     /* Set the hash entry fields. */
@@ -468,8 +468,8 @@ dictEntry *dictAddRawPM(dict *d, void *key)
 
 void dictAddReconstructedPM(dict *d, void *key, void *val)
 {
-#ifdef USE_ND
-    serverLog(LL_ND, "NDHEDIS, dictAddReconstructedPM START");
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM START");
 #endif
     int index;
     dictEntry *entry;
@@ -481,13 +481,13 @@ void dictAddReconstructedPM(dict *d, void *key, void *val)
     /* Get the index of the new element, or -1 if
      * the element already exists. */
     if ((index = _dictKeyIndex(d, (const void *)key)) == -1) {
-#ifdef USE_ND
+#ifdef TODIS
         serverLog(
-                LL_ND,
-                "NDHEDIS, dictAddReconstructedPM key duplicated: %s",
+                LL_TODIS,
+                "TODIS, dictAddReconstructedPM key duplicated: %s",
                 key);
-        dictReplaceNDHEDIS(d, key, val);
-        serverLog(LL_ND, "NDHEDIS, dictAddReconstructedPM duplicated replaced");
+        dictReplaceTODIS(d, key, val);
+        serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM duplicated replaced");
 #endif
         return;
     }
@@ -503,11 +503,11 @@ void dictAddReconstructedPM(dict *d, void *key, void *val)
     entry->next = ht->table[index];
     ht->table[index] = entry;
     ht->used++;
-#ifdef USE_ND
+#ifdef TODIS
     ht->pmem_used++;
     entry->location = LOCATION_PMEM;
-    serverLog(LL_ND, "NDHEDIS, dictAddReconstructedPM pmem used: %ld", ht->pmem_used);
-    serverLog(LL_ND, "NDHEDIS, dictAddReconstructedPM key: %s, val: %s", key, val);
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM pmem used: %ld", ht->pmem_used);
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedPM key: %s, val: %s", key, val);
 #endif
 
     dictSetKey(d, entry, key);
@@ -568,12 +568,12 @@ int dictReplacePM(dict *d, void *key, void *val)
 }
 #endif
 
-#ifdef USE_ND
+#ifdef TODIS
 /* Add an element, discarding the old if the key already exists.
  * Return 1 if the key was added from scratch, 0 if there was already an
  * element with such key and dictReplace() just performed a value update
  * operation. */
-int dictReplaceNDHEDIS(dict *d, void *key, void *val)
+int dictReplaceTODIS(dict *d, void *key, void *val)
 {
     dictEntry *entry, auxentry;
 
@@ -589,7 +589,7 @@ int dictReplaceNDHEDIS(dict *d, void *key, void *val)
      * you want to increment (set), and then decrement (free), and not the
      * reverse. */
     if (entry->location == LOCATION_DRAM) {
-        serverLog(LL_ND, "NDHEDIS, dictReplaceNDHEDIS location dram");
+        serverLog(LL_TODIS, "TODIS, dictReplaceTODIS location dram");
         PMEMoid kv_PM;
         PMEMoid *kv_pm_reference;
 
@@ -601,7 +601,7 @@ int dictReplaceNDHEDIS(dict *d, void *key, void *val)
         dictht *ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
         ht->pmem_used++;
         dictSetVal(d, entry, val);
-        serverLog(LL_ND, "NDHEDIS, dictReplaceNDHEDIS set pmem location completed");
+        serverLog(LL_TODIS, "TODIS, dictReplaceTODIS set pmem location completed");
 
         kv_PM = pmemAddToPmemList((void *)copy, (void *)(((robj *)val)->ptr));
         *kv_pm_reference = kv_PM;
@@ -654,7 +654,7 @@ static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree)
                     dictFreeVal(d, he);
                     zfree(he);
                 }
-#ifdef USE_ND
+#ifdef TODIS
                 if (he->location == LOCATION_PMEM) {
                     d->ht[table].pmem_used--;
                 }
@@ -700,7 +700,7 @@ int _dictClear(dict *d, dictht *ht, void(callback)(void *)) {
             nextHe = he->next;
             dictFreeKey(d, he);
             dictFreeVal(d, he);
-#ifdef USE_ND
+#ifdef TODIS
             if (he->location == LOCATION_PMEM) {
                 ht->pmem_used--;
             }
@@ -900,7 +900,7 @@ dictEntry *dictGetRandomKey(dict *d)
     return he;
 }
 
-#ifdef USE_ND
+#ifdef TODIS
 /* Return a random entry from the hash table. Useful to
  * implement randomized algorithms */
 dictEntry *dictGetRandomKeyPM(dict *d)
@@ -1037,7 +1037,7 @@ unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count) {
     return stored;
 }
 
-#ifdef USE_ND
+#ifdef TODIS
 /* This function samples the dictionary to return a few keys from random
  * locations.
  *

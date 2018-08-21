@@ -52,9 +52,9 @@ typedef struct dictEntry {
         int64_t s64;
         double d;
     } v;
-#ifdef USE_ND
+#ifdef TODIS
     /*
-     * NDHEDIS - Data location : Memory or Persistent store
+     * TODIS - Data location : Memory or Persistent store
      * 0 : DRAM, 1 : PMEM
      * TODO Need to change as an atomic variable
      * */
@@ -79,7 +79,7 @@ typedef struct dictht {
     unsigned long size;
     unsigned long sizemask;
     unsigned long used;
-#ifdef USE_ND
+#ifdef TODIS
     unsigned long pmem_used;
 #endif
 } dictht;
@@ -155,7 +155,7 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 #define dictGetDoubleVal(he) ((he)->v.d)
 #define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size)
 #define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used)
-#ifdef USE_ND
+#ifdef TODIS
 #define dictSizePM(d) ((d)->ht[0].pmem_used + (d)->ht[1].pmem_used)
 #endif
 #define dictIsRehashing(d) ((d)->rehashidx != -1)
@@ -179,11 +179,11 @@ dictIterator *dictGetSafeIterator(dict *d);
 dictEntry *dictNext(dictIterator *iter);
 void dictReleaseIterator(dictIterator *iter);
 dictEntry *dictGetRandomKey(dict *d);
-#ifdef USE_ND
+#ifdef TODIS
 dictEntry *dictGetRandomKeyPM(dict *d);
 #endif
 unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count);
-#ifdef USE_ND
+#ifdef TODIS
 unsigned int dictGetSomeKeysPM(dict *d, dictEntry **des, unsigned int count);
 #endif
 void dictGetStats(char *buf, size_t bufsize, dict *d);
@@ -205,9 +205,9 @@ dictEntry *dictAddRawPM(dict *d, void *key);
 void dictAddReconstructedPM(dict *d, void *key, void *val);
 int dictReplacePM(dict *d, void *key, void *val);
 #endif
-#ifdef USE_ND
+#ifdef TODIS
 int dictAddReconstructedVictim(dict *d, void *key, void *val);
-int dictReplaceNDHEDIS(dict *d, void *key, void *val);
+int dictReplaceTODIS(dict *d, void *key, void *val);
 #endif
 
 /* Hash table types */

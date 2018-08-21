@@ -167,8 +167,8 @@ sds sdsnewlenPM(const void *init, size_t initlen) {
     oid = pmemobj_tx_zalloc(totallen, PM_TYPE_SDS);
     sh = pmemobj_direct(oid);
 
-#ifdef USE_ND
-    serverLog(LL_ND, "NDHEDIS, sdsnewlenPM sds size: %zu", totallen);
+#ifdef TODIS
+    serverLog(LL_TODIS, "TODIS, sdsnewlenPM sds size: %zu", totallen);
     server.used_pmem_memory += totallen;
 #endif
 
@@ -266,8 +266,8 @@ void sdsfreePM(sds s) {
     if (server.persistent) {
         oid.off = (uint64_t)((char*)s-sdsHdrSize(s[-1])) - sizeof(PMEMoid) - (uint64_t)server.pm_pool;
         oid.pool_uuid_lo = server.pool_uuid_lo;
-#ifdef USE_ND
-        serverLog(LL_ND, "NDHEDIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
+#ifdef TODIS
+        serverLog(LL_TODIS, "TODIS, sdsfreePM, sds size: %zu", sdsAllocSizePM(s));
         server.used_pmem_memory -= sdsAllocSizePM(s);
 #endif
         pmemobj_tx_free(oid);
@@ -277,7 +277,7 @@ void sdsfreePM(sds s) {
 }
 #endif
 
-#ifdef USE_ND
+#ifdef TODIS
 /* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfreeVictim(sds s) {
     PMEMoid oid;

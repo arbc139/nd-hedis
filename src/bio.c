@@ -60,7 +60,7 @@
 
 #include "server.h"
 #include "bio.h"
-#ifdef USE_ND
+#ifdef TODIS
 #include "pmem.h"
 #endif
 
@@ -185,17 +185,17 @@ void *bioProcessBackgroundJobs(void *arg) {
         if (type == BIO_CLOSE_FILE) {
             close((long)job->arg1);
         } else if (type == BIO_AOF_FSYNC) {
-#ifdef USE_ND
-            serverLog(LL_ND, "NDHEDIS, aof_fsync process...");
+#ifdef TODIS
+            serverLog(LL_TODIS, "TODIS, aof_fsync process...");
 #endif
             aof_fsync((long)job->arg1);
-#ifdef USE_ND
+#ifdef TODIS
             TX_BEGIN(server.pm_pool) {
                 PMEMoid *victim_first_ptr = (PMEMoid *)job->arg2;
                 freeVictimList(*victim_first_ptr);
                 zfree(victim_first_ptr);
             } TX_ONABORT {
-                serverLog(LL_ND, "NDHEDIS, Flush victim list failed (%s)", __func__);
+                serverLog(LL_TODIS, "TODIS, Flush victim list failed (%s)", __func__);
             } TX_END
 #endif
         } else {

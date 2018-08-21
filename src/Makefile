@@ -119,8 +119,8 @@ endif
 	FINAL_LIBS+= -ldl
 endif
 
-ifeq ($(USE_ND),yes)
-	FINAL_CFLAGS+= -DUSE_ND
+ifeq ($(TODIS),yes)
+	FINAL_CFLAGS+= -DTODIS
 endif
 
 REDIS_CC=$(QUIET_CC)$(CC) $(FINAL_CFLAGS)
@@ -156,7 +156,7 @@ ifeq ($(USE_PMDK),yes)
 	REDIS_SERVER_OBJ+= pmem.o
 endif
 
-ifeq ($(USE_ND),yes)
+ifeq ($(TODIS),yes)
 	REDIS_SERVER_OBJ += t_pmem.o
 endif
 

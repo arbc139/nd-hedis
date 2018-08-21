@@ -45,8 +45,8 @@ int pmemReconstruct(void);
 void pmemKVpairSet(void *key, void *val);
 PMEMoid pmemAddToPmemList(void *key, void *val);
 void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
-#ifdef USE_ND
-int pmemReconstructNDHEDIS(void);
+#ifdef TODIS
+int pmemReconstructTODIS(void);
 void pmemKVpairSetRearrangeList(void *key, void *val);
 PMEMoid pmemUnlinkFromPmemList(PMEMoid oid);
 int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids);

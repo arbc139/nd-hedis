@@ -145,7 +145,7 @@ robj *lookupKeyWrite(redisDb *db, robj *key) {
     return lookupKey(db,key,LOOKUP_NONE);
 }
 
-#ifdef USE_ND
+#ifdef TODIS
 dictEntry *lookupKeyWriteEntry(redisDb *db, robj* key) {
     expireIfNeeded(db, key);
     return lookupKeyEntry(db, key);
@@ -164,24 +164,24 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
     return o;
 }
 
-#ifdef USE_ND
+#ifdef TODIS
 dictEntry *lookupKeyEntry(redisDb *db, robj *key) {
     return dictFind(db->dict, key->ptr);
 }
 #endif
 
-#ifdef USE_ND
+#ifdef TODIS
 int dbReconstructVictim(redisDb *db, robj *key, robj *val) {
-    serverLog(LL_ND, "NDHEDIS, dbReconstructVictim START");
+    serverLog(LL_TODIS, "TODIS, dbReconstructVictim START");
     dictEntry *de = lookupKeyEntry(db, key);
     if (de == NULL) {
-        feedAppendOnlyFileNDHEDIS(db, key, val);
+        feedAppendOnlyFileTODIS(db, key, val);
     } else if (de->location == LOCATION_DRAM) {
         decrRefCount(key);
         decrRefCount(val);
         return C_ERR;
     }
-    serverLog(LL_ND, "NDHEDIS, dictAddReconstructedVictim END");
+    serverLog(LL_TODIS, "TODIS, dictAddReconstructedVictim END");
     return C_OK;
 }
 #endif
@@ -242,8 +242,8 @@ void dbOverwritePM(redisDb *db, robj *key, robj *val) {
     dictEntry *de = dictFind(db->dict,key->ptr);
 
     serverAssertWithInfo(NULL,key,de != NULL);
-#ifdef USE_ND
-    dictReplaceNDHEDIS(db->dict, key->ptr, val);
+#ifdef TODIS
+    dictReplaceTODIS(db->dict, key->ptr, val);
 #else
     dictReplacePM(db->dict, key->ptr, val);
 #endif
@@ -274,9 +274,9 @@ void setKeyPM(redisDb *db, robj *key, robj *val) {
     if (de == NULL) {
         dbAddPM(db,key,val);
     } else {
-#ifdef USE_ND
+#ifdef TODIS
         if (de->location == LOCATION_DRAM) {
-            propagateExpireNDHEDIS(db, de);
+            propagateExpireTODIS(db, de);
         }
 #endif
         dbOverwritePM(db,key,val);
@@ -998,7 +998,7 @@ void propagateExpire(redisDb *db, robj *key) {
     decrRefCount(argv[1]);
 }
 
-#ifdef USE_ND
+#ifdef TODIS
 /* Propagate expires into slaves and the AOF file.
  * When a key expires in the master, a DEL operation for this key is sent
  * to all the slaves and the AOF file if enabled.
@@ -1007,10 +1007,10 @@ void propagateExpire(redisDb *db, robj *key) {
  * AOF and the master->slave link guarantee operation ordering, everything
  * will be consistent even if we allow write operations against expiring
  * keys. */
-void propagateExpireNDHEDIS(redisDb *db, dictEntry *entry) {
+void propagateExpireTODIS(redisDb *db, dictEntry *entry) {
     robj *argv[2];
-    serverLog(LL_ND, "   ");
-    serverLog(LL_ND, "NDHEDIS, propagateExpireNDHEDIS START");
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, propagateExpireTODIS START");
 
     sds key = dictGetKey(entry);
     robj *keyobj = createStringObject(key, sdslen(key));
@@ -1026,7 +1026,7 @@ void propagateExpireNDHEDIS(redisDb *db, dictEntry *entry) {
 
     decrRefCount(argv[0]);
     decrRefCount(argv[1]);
-    serverLog(LL_ND, "NDHEDIS, propagateExpireNDHEDIS END");
+    serverLog(LL_TODIS, "TODIS, propagateExpireTODIS END");
 }
 #endif
 
@@ -1060,9 +1060,9 @@ int expireIfNeeded(redisDb *db, robj *key) {
 
     /* Delete the key */
     server.stat_expiredkeys++;
-#ifdef USE_ND
+#ifdef TODIS
     dictEntry *entry = lookupKeyEntry(db, key);
-    propagateExpireNDHEDIS(db, entry);
+    propagateExpireTODIS(db, entry);
 #else
     propagateExpire(db,key);
 #endif
