@@ -835,13 +835,15 @@ struct redisServer {
     clientBufferLimitsConfig client_obuf_limits[CLIENT_TYPE_OBUF_COUNT];
 #ifdef USE_PMDK
     /* Persistent memory */
-    char* pm_file_path;             /* Path to persistent memory file */
-    size_t pm_file_size;            /* If PM file does not exist, create new one with given size */
-    bool persistent;                /* Persistence enabled/disabled */
-    bool pm_reconstruct_required; /* reconstruct database form PMEM */
-    PMEMobjpool *pm_pool;           /* PMEM pool handle */
-    TOID(struct redis_pmem_root) pm_rootoid; /*PMEM root object OID*/
-    uint64_t pool_uuid_lo;          /* PMEM pool UUID */
+    char* pm_file_path;                         /* Path to persistent memory file */
+    size_t pm_file_size;                        /* If PM file does not exist, create new one with given size */
+    bool persistent;                            /* Persistence enabled/disabled */
+    bool pm_reconstruct_required;               /* reconstruct database form PMEM */
+    PMEMobjpool *pm_pool;                       /* PMEM pool handle */
+    TOID(struct redis_pmem_root) pm_rootoid;    /*PMEM root object OID*/
+    uint64_t pool_uuid_lo;                      /* PMEM pool UUID */
+    size_t pm_read_latency;                     /* Emulated persistent memory read latency */
+    size_t pm_write_latency;                    /* Emulated persistent memory write latency */
 #endif
     /* AOF persistence */
     int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
@@ -1129,6 +1131,8 @@ extern dictType replScriptCacheDictType;
  *----------------------------------------------------------------------------*/
 
 /* Utils */
+struct timespec nstimespec(void);
+int nstimeCompare(const struct timespec a, const struct timespec b);
 long long ustime(void);
 long long mstime(void);
 void getRandomHexChars(char *p, unsigned int len);
