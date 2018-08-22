@@ -32,6 +32,7 @@
 #include "obj.h"
 #include "libpmemobj.h"
 #include "util.h"
+#include "pmem_latency.h"
 
 int
 pmemReconstruct(void)
@@ -47,8 +48,8 @@ pmemReconstruct(void)
     root = server.pm_rootoid;
     pmem_base_addr = (void *)server.pm_pool->addr;
     d = server.db[0].dict;
-    dictExpand(d, D_RO(root)->num_dict_entries);
-    for (kv_PM_oid = D_RO(root)->pe_first; TOID_IS_NULL(kv_PM_oid) == 0; kv_PM_oid = D_RO(kv_PM_oid)->pmem_list_next){
+    dictExpand(d, D_RO_LATENCY(root)->num_dict_entries);
+    for (kv_PM_oid = D_RO_LATENCY(root)->pe_first; TOID_IS_NULL(kv_PM_oid) == 0; kv_PM_oid = D_RO_LATENCY(kv_PM_oid)->pmem_list_next){
 		kv_PM = (key_val_pair_PM *)(kv_PM_oid.oid.off + (uint64_t)pmem_base_addr);
 		key = (void *)(kv_PM->key_oid.off + (uint64_t)pmem_base_addr);
 		val = (void *)(kv_PM->val_oid.off + (uint64_t)pmem_base_addr);
@@ -65,12 +66,12 @@ void pmemKVpairSet(void *key, void *val)
     struct key_val_pair_PM *kv_PM_p;
 
     kv_PM_oid = sdsPMEMoidBackReference((sds)key);
-    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct(*kv_PM_oid);
+    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct_latency(*kv_PM_oid);
 
     val_oid.pool_uuid_lo = server.pool_uuid_lo;
     val_oid.off = (uint64_t)val - (uint64_t)server.pm_pool->addr;
 
-    TX_ADD_FIELD_DIRECT(kv_PM_p, val_oid);
+    TX_ADD_FIELD_DIRECT_LATENCY(kv_PM_p, val_oid);
     kv_PM_p->val_oid = val_oid;
     return;
 }
@@ -91,22 +92,22 @@ pmemAddToPmemList(void *key, void *val)
     val_oid.pool_uuid_lo = server.pool_uuid_lo;
     val_oid.off = (uint64_t)val - (uint64_t)server.pm_pool->addr;
 
-    kv_PM = pmemobj_tx_zalloc(sizeof(struct key_val_pair_PM), pm_type_key_val_pair_PM);
-    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct(kv_PM);
+    kv_PM = pmemobj_tx_zalloc_latency(sizeof(struct key_val_pair_PM), pm_type_key_val_pair_PM);
+    kv_PM_p = (struct key_val_pair_PM *)pmemobj_direct_latency(kv_PM);
     kv_PM_p->key_oid = key_oid;
     kv_PM_p->val_oid = val_oid;
     typed_kv_PM.oid = kv_PM;
 
-    root = pmemobj_direct(server.pm_rootoid.oid);
+    root = pmemobj_direct_latency(server.pm_rootoid.oid);
 
     kv_PM_p->pmem_list_next = root->pe_first;
     if(!TOID_IS_NULL(root->pe_first)) {
-        struct key_val_pair_PM *head = D_RW(root->pe_first);
-        TX_ADD_FIELD_DIRECT(head,pmem_list_prev);
+        struct key_val_pair_PM *head = D_RW_LATENCY(root->pe_first);
+        TX_ADD_FIELD_DIRECT_LATENCY(head,pmem_list_prev);
     	head->pmem_list_prev = typed_kv_PM;
     }
 
-    TX_ADD_DIRECT(root);
+    TX_ADD_DIRECT_LATENCY(root);
     root->pe_first = typed_kv_PM;
     root->num_dict_entries++;
 
@@ -119,38 +120,38 @@ pmemRemoveFromPmemList(PMEMoid kv_PM_oid)
     TOID(struct key_val_pair_PM) typed_kv_PM;
     struct redis_pmem_root *root;
 
-    root = pmemobj_direct(server.pm_rootoid.oid);
+    root = pmemobj_direct_latency(server.pm_rootoid.oid);
 
     typed_kv_PM.oid = kv_PM_oid;
 
     if(TOID_EQUALS(root->pe_first, typed_kv_PM)) {
-    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO(typed_kv_PM)->pmem_list_next;
+    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO_LATENCY(typed_kv_PM)->pmem_list_next;
     	if(!TOID_IS_NULL(typed_kv_PM_next)){
-    		struct key_val_pair_PM *next = D_RW(typed_kv_PM_next);
-    		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
+    		struct key_val_pair_PM *next = D_RW_LATENCY(typed_kv_PM_next);
+    		TX_ADD_FIELD_DIRECT_LATENCY(next,pmem_list_prev);
     		next->pmem_list_prev.oid = OID_NULL;
     	}
-    	TX_FREE(root->pe_first);
-    	TX_ADD_DIRECT(root);
+    	TX_FREE_LATENCY(root->pe_first);
+    	TX_ADD_DIRECT_LATENCY(root);
     	root->pe_first = typed_kv_PM_next;
         root->num_dict_entries--;
         return;
     }
     else {
-    	TOID(struct key_val_pair_PM) typed_kv_PM_prev = D_RO(typed_kv_PM)->pmem_list_prev;
-    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO(typed_kv_PM)->pmem_list_next;
+    	TOID(struct key_val_pair_PM) typed_kv_PM_prev = D_RO_LATENCY(typed_kv_PM)->pmem_list_prev;
+    	TOID(struct key_val_pair_PM) typed_kv_PM_next = D_RO_LATENCY(typed_kv_PM)->pmem_list_next;
     	if(!TOID_IS_NULL(typed_kv_PM_prev)){
-    		struct key_val_pair_PM *prev = D_RW(typed_kv_PM_prev);
-    		TX_ADD_FIELD_DIRECT(prev,pmem_list_next);
+    		struct key_val_pair_PM *prev = D_RW_LATENCY(typed_kv_PM_prev);
+    		TX_ADD_FIELD_DIRECT_LATENCY(prev,pmem_list_next);
     		prev->pmem_list_next = typed_kv_PM_next;
     	}
     	if(!TOID_IS_NULL(typed_kv_PM_next)){
-    		struct key_val_pair_PM *next = D_RW(typed_kv_PM_next);
-    		TX_ADD_FIELD_DIRECT(next,pmem_list_prev);
+    		struct key_val_pair_PM *next = D_RW_LATENCY(typed_kv_PM_next);
+    		TX_ADD_FIELD_DIRECT_LATENCY(next,pmem_list_prev);
     		next->pmem_list_prev = typed_kv_PM_prev;
     	}
-    	TX_FREE(typed_kv_PM);
-    	TX_ADD_FIELD_DIRECT(root,num_dict_entries);
+    	TX_FREE_LATENCY(typed_kv_PM);
+    	TX_ADD_FIELD_DIRECT_LATENCY(root,num_dict_entries);
         root->num_dict_entries--;
         return;
     }
