@@ -9,19 +9,21 @@
 void emulateReadLatency(void) {
     struct timespec base = nstimespec();
     base.tv_nsec += server.pm_read_latency;
+    int count = 0;
     while (nstimeCompare(base, nstimespec()) == 1) {
-        // serverLog(LL_PB, "read latency loop");
-        true;
+        count++;
     }
+    // serverLog(LL_NOTICE, "read latency loop: %d", count);
 }
 
 void emulateWriteLatency(void) {
     struct timespec base = nstimespec();
     base.tv_nsec += server.pm_write_latency;
+    int count = 0;
     while (nstimeCompare(base, nstimespec()) == 1) {
-        // serverLog(LL_PB, "write latency loop");
-        true;
+        count++;
     }
+    // serverLog(LL_NOTICE, "write latency loop: %d", count);
 }
 
 void *pmemobj_direct_latency(PMEMoid oid) {

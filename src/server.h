@@ -189,6 +189,7 @@ typedef long long mstime_t; /* millisecond time type. */
 
 #ifdef TODIS
 #define CONFIG_MIN_MAX_PMEM_MEMORY_SIZE 1024 /* 1KB */
+#define CONFIG_MIN_PMEM_FIRE_EVICT_PERCENT 1
 #define CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE CONFIG_MIN_MAX_PMEM_MEMORY_SIZE
 #define CONFIG_DEFAULT_TODIS_LOG_ONLY 0
 #define CONFIG_MIN_PMEM_VICTIM_COUNT 1
@@ -881,6 +882,7 @@ struct redisServer {
     long long free_pmem_time_feed_dram_log;
     size_t used_pmem_memory;        /* Used memory capacity in pmem */
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
+    size_t pmem_fire_evict_percent; /* Percent of pmem memory firing eviction */
     int max_pmem_memory_policy;     /* Policy for key eviction */
     size_t pmem_victim_count;       /* Number of Victim in eviction */
     int todis_log_only;             /* Force to write todis log only */

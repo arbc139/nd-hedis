@@ -324,24 +324,6 @@ void loadServerConfigFromString(char *config) {
                 err = "Invalid maxmemory policy";
                 goto loaderr;
             }
-#ifdef TODIS
-        } else if (!strcasecmp(argv[0], "max-pmem-memory-policy") && argc == 2) {
-            server.max_pmem_memory_policy =
-                configEnumGetValue(max_pmem_memory_policy_enum, argv[1]);
-            if (server.max_pmem_memory_policy == INT_MIN) {
-                err = "Invalid maxmemory policy";
-                goto loaderr;
-            }
-#endif
-#ifdef TODIS
-        } else if (!strcasecmp(argv[0], "pmem-victim-count") && argc == 2) {
-            long long pmem_victim_count = atoi(argv[1]);
-            if (pmem_victim_count < CONFIG_MIN_PMEM_VICTIM_COUNT) {
-                err = "Invalid pmem victim count";
-                goto loaderr;
-            }
-            server.pmem_victim_count = pmem_victim_count;
-#endif
         } else if (!strcasecmp(argv[0],"maxmemory-samples") && argc == 2) {
             server.maxmemory_samples = atoi(argv[1]);
             if (server.maxmemory_samples <= 0) {
@@ -438,12 +420,42 @@ void loadServerConfigFromString(char *config) {
             server.pm_file_size = size;
 #endif
 #ifdef TODIS
-        } else if (!strcasecmp(argv[0],"max_pmem_memory") && (argc == 2)) {
+        } else if (!strcasecmp(argv[0],"max-pmem-memory") && (argc == 2)) {
             long long max_pmem_memory = memtoll(argv[1],NULL);
             if (max_pmem_memory < CONFIG_MIN_MAX_PMEM_MEMORY_SIZE) {
                 err = "Invalid max pmem memory size"; goto loaderr;
             }
             server.max_pmem_memory = max_pmem_memory;
+#endif
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0], "pmem-fire-evict-percent") && argc == 2) {
+            long long pmem_fire_evict_percent = atoi(argv[1]);
+            if (
+                pmem_fire_evict_percent < CONFIG_MIN_PMEM_FIRE_EVICT_PERCENT ||
+                pmem_fire_evict_percent > 100
+            ) {
+                err = "Invalid pmem fire evict percent";
+                goto loaderr;
+            }
+            server.pmem_fire_evict_percent = pmem_fire_evict_percent;
+#endif
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0], "max-pmem-memory-policy") && argc == 2) {
+            server.max_pmem_memory_policy =
+                configEnumGetValue(max_pmem_memory_policy_enum, argv[1]);
+            if (server.max_pmem_memory_policy == INT_MIN) {
+                err = "Invalid maxmemory policy";
+                goto loaderr;
+            }
+#endif
+#ifdef TODIS
+        } else if (!strcasecmp(argv[0], "pmem-victim-count") && argc == 2) {
+            long long pmem_victim_count = atoi(argv[1]);
+            if (pmem_victim_count < CONFIG_MIN_PMEM_VICTIM_COUNT) {
+                err = "Invalid pmem victim count";
+                goto loaderr;
+            }
+            server.pmem_victim_count = pmem_victim_count;
 #endif
 #ifdef TODIS
         } else if (!strcasecmp(argv[0], "pm-read-latency") && (argc == 2)) {

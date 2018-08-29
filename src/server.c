@@ -1613,6 +1613,7 @@ void initServerConfig(void) {
 #ifdef TODIS
     server.used_pmem_memory = 0;
     server.max_pmem_memory = CONFIG_DEFAULT_MAX_PMEM_MEMORY_SIZE;
+    server.pmem_fire_evict_percent = -1;
     server.max_pmem_memory_policy = CONFIG_DEFAULT_MAXMEMORY_POLICY;
     server.pmem_victim_count = CONFIG_MIN_PMEM_VICTIM_COUNT;
     server.todis_log_only = CONFIG_DEFAULT_TODIS_LOG_ONLY;
@@ -2594,7 +2595,7 @@ int processCommand(client *c) {
     }
 
 #ifdef TODIS
-    if (server.max_pmem_memory) {
+    if (server.pmem_fire_evict_percent > 0 || server.max_pmem_memory) {
         long long start_time_evict = ustime();
         freePmemMemoryIfNeeded();
         long long end_time_evict = ustime();
@@ -3884,13 +3885,29 @@ int freeMemoryIfNeeded(void) {
 int freePmemMemoryIfNeeded(void) {
     /* Compute how much pmem memory we need to free. */
     size_t pmem_used = pmem_used_memory();
-    size_t pmem_tofree = pmem_used - server.max_pmem_memory;
+    size_t pmem_tofree = 0;
+    if (server.pmem_fire_evict_percent > 0) {
+        pmem_tofree = pmem_used - server.pm_file_size * server.pmem_fire_evict_percent / 100;
+    } else {
+        pmem_tofree = pmem_used - server.max_pmem_memory;
+    }
     size_t pmem_freed = 0;
 
     pmem_used = pmem_used_memory();
 
     /* Check if we are over the persistent memory limit. */
-    if (pmem_used <= server.max_pmem_memory) return C_OK;
+    if (
+        (
+            server.pmem_fire_evict_percent > 0 &&
+            pmem_used <= server.pm_file_size * server.pmem_fire_evict_percent / 100
+        ) ||
+        (
+            server.pmem_fire_evict_percent <= 0 &&
+            pmem_used <= server.max_pmem_memory
+        )
+    ) {
+        return C_OK;
+    }
 
     if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
         return C_ERR; /* We need to free pmem memory, but policy forbids. */
