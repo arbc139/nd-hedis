@@ -284,6 +284,9 @@ void setKeyPM(redisDb *db, robj *key, robj *val) {
     /* TODO: incrRefCount(val); */
     removeExpire(db,key);
     signalModifiedKey(db,key);
+    if (server.max_used_pmem_memory < server.used_pmem_memory) {
+        server.max_used_pmem_memory = server.used_pmem_memory;
+    }
 }
 #endif
 

@@ -881,6 +881,7 @@ struct redisServer {
     long long free_pmem_time_add_dram_entry;
     long long free_pmem_time_feed_dram_log;
     size_t used_pmem_memory;        /* Used memory capacity in pmem */
+    size_t max_used_pmem_memory;    /* Maximum used memory capacity in pmem */
     size_t max_pmem_memory;         /* Maximum memory capacity for pmem */
     size_t pmem_fire_evict_percent; /* Percent of pmem memory firing eviction */
     int max_pmem_memory_policy;     /* Policy for key eviction */

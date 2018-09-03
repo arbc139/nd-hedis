@@ -189,6 +189,16 @@ void getPmemStatusCommand(client *c) {
     addReplyBulkLongLong(c, used_pmem_memory);
     numreplies++;
 
+    addReplyBulkCString(c, "max used pmem memory:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.max_used_pmem_memory);
+    numreplies++;
+
+    if (c->argc < 2 || strcmp(c->argv[1]->ptr, "*") != 0) {
+        setDeferredMultiBulkLength(c, replylen, numreplies);
+        return;
+    }
+
     addReplyBulkCString(c, "pmem entries:");
     numreplies++;
     addReplyBulkLongLong(c, dictSizePM(c->db->dict));
