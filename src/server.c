@@ -3886,17 +3886,18 @@ int freeMemoryIfNeeded(void) {
 int freePmemMemoryIfNeeded(void) {
     /* Compute how much pmem memory we need to free. */
     size_t pmem_used = pmem_used_memory();
-    size_t pmem_tofree = 0;
+    size_t pmem_tofree = pmem_used - server.max_pmem_memory;;
+    /*
     if (server.pmem_fire_evict_percent > 0) {
         pmem_tofree = pmem_used - server.pm_file_size * server.pmem_fire_evict_percent / 100;
     } else {
         pmem_tofree = pmem_used - server.max_pmem_memory;
     }
+    */
     size_t pmem_freed = 0;
 
-    pmem_used = pmem_used_memory();
-
     /* Check if we are over the persistent memory limit. */
+    /*
     if (
         (
             server.pmem_fire_evict_percent > 0 &&
@@ -3909,12 +3910,17 @@ int freePmemMemoryIfNeeded(void) {
     ) {
         return C_OK;
     }
+    */
+    if (pmem_used <= server.max_pmem_memory) {
+        return C_OK;
+    }
 
     if (server.max_pmem_memory_policy == MAXMEMORY_NO_EVICTION)
         return C_ERR; /* We need to free pmem memory, but policy forbids. */
 
     serverLog(LL_TODIS, "##############################");
     serverLog(LL_TODIS, "TODIS, pmem eviction is fired.");
+    // serverLog(LL_NOTICE, "TODIS, pmem eviction is fired.");
 
     while (pmem_freed < pmem_tofree) {
         serverLog(LL_TODIS, "TODIS, pmem freed: %zu, pmem tofree: %zu", pmem_freed, pmem_tofree);
@@ -3971,13 +3977,12 @@ int freePmemMemoryIfNeeded(void) {
                     (sds) bestkey,
                     (sds) bestval->ptr);
 
-            sds dramkey = sdsdup(bestkey);
             robj *dramval = createStringObject(sdsdup(bestval->ptr), sdslen(bestval->ptr));
 
             serverLog(
                     LL_TODIS,
                     "TODIS, eviction dramkey: %s, dramval: %s",
-                    (sds) dramkey,
+                    (sds) bestkey,
                     (sds) dramval->ptr);
 
             robj *keyobj = createStringObject(sdsdup(bestkey), sdslen(bestkey));
@@ -4002,7 +4007,7 @@ int freePmemMemoryIfNeeded(void) {
 
             long long free_pmem_time_add_dram_entry_start = ustime();
             /* Adds DRAM dictEntry to DB. */
-            robj *dramkeyobj = createStringObject(dramkey, sdslen(dramkey));
+            robj *dramkeyobj = createStringObject(bestkey, sdslen(bestkey));
             dbAdd(db, dramkeyobj, dramval);
             long long free_pmem_time_add_dram_entry_end = ustime();
             server.free_pmem_time_add_dram_entry += free_pmem_time_add_dram_entry_end - free_pmem_time_add_dram_entry_start;
