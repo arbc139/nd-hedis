@@ -8,6 +8,9 @@ Implemented by totorody.
 
 ## Run ND-Hedis server (root)
     % PMEM_IS_PMEM_FORCE=1 ./src/redis-server ${some-configuration-file}
+    
+## Publications (Best Poster Awards)
+Doyoung Kim, Won Gi Choi, Hanseung Sung, and Sanghyun Park, A scalable and persistent key-value store using non-volatile memory, In Proceedings of the 34th ACM/SIGAPP Symposium on Applied Computing (SAC '19), Limassol-Cyprus, Apr 2019, pp. 464-467
 
 -------------
 This README is just a fast *quick start* document. You can find more detailed documentation at http://redis.io.
