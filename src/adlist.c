@@ -166,8 +166,8 @@ void listDelNode(list *list, listNode *node)
         node->next->prev = node->prev;
     else
         list->tail = node->prev;
-    if (list->free) list->free(node->value);
-    zfree(node);
+    //if (list->free) list->free(node->value);
+    //zfree(node);
     list->len--;
 }
 

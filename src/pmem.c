@@ -204,6 +204,7 @@ pmemAddToPmemList(void *key, void *val)
     }
 
     if (TOID_IS_NULL(root->pe_last)) {
+        TX_ADD_DIRECT_LATENCY(root);
         root->pe_last = pmem_toid;
     }
 
@@ -439,6 +440,21 @@ int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids) {
         }
         return C_OK;
     }
+
+    /* allkeys-lru-everything policy */
+    else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU_EVERYTHING) {
+        TOID(struct key_val_pair_PM) victim_toid = root_obj->pe_last;
+        for (int i = 0; i < num_pmem_entries; ++i) {
+            if (TOID_IS_NULL(victim_toid)) {
+                serverLog(LL_NOTICE, "FATAL: victim_toid is NULL: %d", i);
+                return C_ERR;
+            } else {
+                victim_oids[i] = victim_toid.oid;
+            }
+            victim_toid = D_RO_LATENCY(victim_toid)->pmem_list_prev;
+        }
+        return C_OK;
+    }
     return C_ERR;
 }
 #endif
@@ -623,6 +639,17 @@ int evictPmemNodesToVictimList(PMEMoid *victim_oids) {
         }
 
         serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList LRU END");
+        return C_OK;
+    }
+    else if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU_EVERYTHING) {
+        TX_ADD_DIRECT_LATENCY(root);
+        root->victim_first = root->pe_first;
+        root->pe_last = TOID_NULL(struct key_val_pair_PM);
+        root->pe_first = TOID_NULL(struct key_val_pair_PM);
+        root->num_victim_entries += root->num_dict_entries;
+        root->num_dict_entries = 0;
+
+        serverLog(LL_TODIS, "TODIS, evictPmemNodesToVictimList LRU-EVERYTHING END");
         return C_OK;
     }
 

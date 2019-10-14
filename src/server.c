@@ -3886,7 +3886,7 @@ int freeMemoryIfNeeded(void) {
 int freePmemMemoryIfNeeded(void) {
     /* Compute how much pmem memory we need to free. */
     size_t pmem_used = pmem_used_memory();
-    size_t pmem_tofree = pmem_used - server.max_pmem_memory;;
+    size_t pmem_tofree = pmem_used - server.max_pmem_memory;
     /*
     if (server.pmem_fire_evict_percent > 0) {
         pmem_tofree = pmem_used - server.pm_file_size * server.pmem_fire_evict_percent / 100;
@@ -3928,15 +3928,26 @@ int freePmemMemoryIfNeeded(void) {
         dictEntry *victim_de = NULL;
         redisDb *db = NULL;
 
+
+        size_t victim_entries = 0;
+        if (server.max_pmem_memory_policy == MAXMEMORY_ALLKEYS_LRU_EVERYTHING) {
+            TOID(struct redis_pmem_root) root = server.pm_rootoid;
+            struct redis_pmem_root *root_obj = pmemobj_direct(root.oid);
+            victim_entries = root_obj->num_dict_entries;
+        } else {
+            victim_entries = server.pmem_victim_count;
+        }
+
         /* Find a victim key. */
         long long free_pmem_time_find_victim_key_start = ustime();
-        PMEMoid *victim_oids = zmalloc(sizeof(PMEMoid) * server.pmem_victim_count);
-        if (getBestEvictionKeysPMEMoid(victim_oids) == C_ERR)
+        PMEMoid *victim_oids = zmalloc(sizeof(PMEMoid) * victim_entries);
+        if (getBestEvictionKeysPMEMoid(victim_oids) == C_ERR) {
             return C_ERR;
+        }
         long long free_pmem_time_find_victim_key_end = ustime();
         server.free_pmem_time_find_victim_key += free_pmem_time_find_victim_key_end - free_pmem_time_find_victim_key_start;
 
-        for (size_t i = 0; i < server.pmem_victim_count; ++i) {
+        for (size_t i = 0; i < victim_entries; ++i) {
             PMEMoid victim_oid = victim_oids[i];
             if (OID_IS_NULL(victim_oid))
                 continue;

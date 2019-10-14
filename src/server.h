@@ -454,6 +454,10 @@ typedef long long mstime_t; /* millisecond time type. */
 #define MAXMEMORY_NO_EVICTION 5
 #define CONFIG_DEFAULT_MAXMEMORY_POLICY MAXMEMORY_NO_EVICTION
 
+#ifdef TODIS
+#define MAXMEMORY_ALLKEYS_LRU_EVERYTHING 6
+#endif
+
 /* Scripting */
 #define LUA_SCRIPT_TIME_LIMIT 5000 /* milliseconds */
 

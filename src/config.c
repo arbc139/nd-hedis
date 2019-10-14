@@ -60,6 +60,7 @@ configEnum max_pmem_memory_policy_enum[] = {
     {"volatile-ttl",MAXMEMORY_VOLATILE_TTL},
     {"allkeys-lru",MAXMEMORY_ALLKEYS_LRU},
     {"allkeys-random",MAXMEMORY_ALLKEYS_RANDOM},
+    {"allkeys-lru-everything",MAXMEMORY_ALLKEYS_LRU_EVERYTHING},
     {"noeviction",MAXMEMORY_NO_EVICTION},
     {NULL, 0}
 };

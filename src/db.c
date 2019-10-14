@@ -274,11 +274,13 @@ void setKeyPM(redisDb *db, robj *key, robj *val) {
     if (de == NULL) {
         dbAddPM(db,key,val);
     } else {
+/*
 #ifdef TODIS
         if (de->location == LOCATION_DRAM) {
             propagateExpireTODIS(db, de);
         }
 #endif
+*/
         dbOverwritePM(db,key,val);
     }
     /* TODO: incrRefCount(val); */
