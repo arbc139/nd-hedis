@@ -44,10 +44,12 @@ typedef struct key_val_pair_PM {
 int pmemReconstruct(void);
 void pmemKVpairSet(void *key, void *val);
 PMEMoid pmemAddToPmemList(void *key, void *val);
+PMEMoid pmemLinkToPmemListByOid(PMEMoid oid);
 void pmemRemoveFromPmemList(PMEMoid kv_PM_oid);
 #ifdef TODIS
 int pmemReconstructTODIS(void);
 void pmemKVpairSetRearrangeList(void *key, void *val);
+void pmemKVpairSetRearrangeList_legacy(void *key, void *val);
 PMEMoid pmemUnlinkFromPmemList(PMEMoid oid);
 int getBestEvictionKeysPMEMoid(PMEMoid *victim_oids);
 PMEMoid getBestEvictionKeyPMEMoid(void);

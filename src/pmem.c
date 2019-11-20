@@ -154,13 +154,63 @@ void pmemKVpairSetRearrangeList(void *key, void *val)
     PMEMoid *pmem_oid_ptr;
 
     pmem_oid_ptr = sdsPMEMoidBackReference((sds)key);
+    long long start_queue_update_remove_list_time = ustime();
+    pmemUnlinkFromPmemList(*pmem_oid_ptr);
+    long long end_queue_update_remove_list_time = ustime();
+    server.queue_update_remove_list_time += end_queue_update_remove_list_time - start_queue_update_remove_list_time;
+    long long start_queue_update_add_list_time = ustime();
+    pmemLinkToPmemListByOid(*pmem_oid_ptr);
+    long long end_queue_update_add_list_time = ustime();
+    server.queue_update_add_list_time += end_queue_update_add_list_time - start_queue_update_add_list_time;
+    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList END");
+    return;
+}
+
+void pmemKVpairSetRearrangeList_legacy(void *key, void *val)
+{
+    serverLog(LL_TODIS, "   ");
+    serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList START");
+    PMEMoid *pmem_oid_ptr;
+
+    pmem_oid_ptr = sdsPMEMoidBackReference((sds)key);
+    long long start_queue_update_remove_list_time = ustime();
     pmemRemoveFromPmemList(*pmem_oid_ptr);
+    long long end_queue_update_remove_list_time = ustime();
+    server.queue_update_remove_list_time += end_queue_update_remove_list_time - start_queue_update_remove_list_time;
+    long long start_queue_update_add_list_time = ustime();
     PMEMoid new_pmem_oid = pmemAddToPmemList(key, val);
+    long long end_queue_update_add_list_time = ustime();
+    server.queue_update_add_list_time += end_queue_update_add_list_time - start_queue_update_add_list_time;
     *pmem_oid_ptr = new_pmem_oid;
     serverLog(LL_TODIS, "TODIS, pmemKVpairSetRearrangeList END");
     return;
 }
 #endif
+
+PMEMoid pmemLinkToPmemListByOid(PMEMoid oid) {
+    TOID(struct key_val_pair_PM) pmem_toid;
+    pmem_toid.oid = oid;
+
+    struct redis_pmem_root *root = pmemobj_direct_latency(server.pm_rootoid.oid);
+    struct key_val_pair_PM *pmem_obj = (struct key_val_pair_PM *) pmemobj_direct_latency(oid);
+
+    pmem_obj->pmem_list_next = root->pe_first;
+    if (!TOID_IS_NULL(root->pe_first)) {
+        struct key_val_pair_PM *head = D_RW_LATENCY(root->pe_first);
+        TX_ADD_FIELD_DIRECT_LATENCY(head, pmem_list_prev);
+        head->pmem_list_prev = pmem_toid;
+    }
+
+    if (TOID_IS_NULL(root->pe_last)) {
+        root->pe_last = pmem_toid;
+    }
+
+    TX_ADD_DIRECT_LATENCY(root);
+    root->pe_first = pmem_toid;
+    root->num_dict_entries++;
+
+    return oid;
+}
 
 PMEMoid
 pmemAddToPmemList(void *key, void *val)

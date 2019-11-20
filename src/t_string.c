@@ -90,12 +90,14 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     if (server.persistent) {
         int error = 0;
         robj *convertedVal = val;
+        bool isNeedFree = false;
 
 #ifdef TODIS
         if (val->encoding == OBJ_ENCODING_INT) {
-            char int_str_buf[1024];
-            sprintf(int_str_buf, "%lld", val->ptr);
-            convertedVal = createStringObject(int_str_buf, strlen(int_str_buf));
+            char int_str_buf[32];
+            int int_str_buf_len = ll2string(int_str_buf, 32, (long long) val->ptr);
+            convertedVal = createStringObject(int_str_buf, int_str_buf_len);
+            isNeedFree = true;
         }
 #endif
         /* Copy value from RAM to PM - create RedisObject and sds(value) */
@@ -107,6 +109,10 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         } TX_ONABORT {
             error = 1;
         } TX_END
+
+        if (isNeedFree) {
+            decrRefCount(convertedVal);
+        }
 
         if (error) {
             addReplyError(c, "setting key in PM failed!");
@@ -128,6 +134,7 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
 
 /* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
 void setCommand(client *c) {
+    long long start_insert_time = ustime();
     int j;
     robj *expire = NULL;
     int unit = UNIT_SECONDS;
@@ -171,6 +178,8 @@ void setCommand(client *c) {
 
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
+    long long end_insert_time = ustime();
+    server.insert_time += end_insert_time - start_insert_time;
 }
 
 void setnxCommand(client *c) {
@@ -204,7 +213,10 @@ int getGenericCommand(client *c) {
 }
 
 void getCommand(client *c) {
+    long long start_access_time = ustime();
     getGenericCommand(c);
+    long long end_access_time = ustime();
+    server.access_time += end_access_time - start_access_time;
 }
 
 void getsetCommand(client *c) {

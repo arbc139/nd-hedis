@@ -609,7 +609,11 @@ int dictReplaceTODIS(dict *d, void *key, void *val)
     } else {
         auxentry = *entry;
         dictSetVal(d, entry, val);
+        long long start_queue_update_time = ustime();
+        // pmemKVpairSetRearrangeList_legacy(entry->key, ((robj *)val)->ptr);
         pmemKVpairSetRearrangeList(entry->key, ((robj *)val)->ptr);
+        long long end_queue_update_time = ustime();
+        server.queue_update_time += end_queue_update_time - start_queue_update_time;
         dictFreeVal(d, &auxentry);
         return 0;
     }

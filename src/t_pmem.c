@@ -126,50 +126,75 @@ void getPmemProcessTimeCommand(client *c) {
     void *replylen = addDeferredMultiBulkLength(c);
     unsigned long numreplies = 0;
 
-    addReplyBulkCString(c, "pmem used time for list process:");
+    addReplyBulkCString(c, "Insert time:");
+    numreplies++;
+    addReplyBulkLongLong(c, server.insert_time);
+    numreplies++;
+
+    addReplyBulkCString(c, "Tiering time:");
     numreplies++;
     addReplyBulkLongLong(c, server.pmem_list_time);
     numreplies++;
 
-    addReplyBulkCString(c, "total process used time:");
+    addReplyBulkCString(c, "Queue update time:");
     numreplies++;
-    addReplyBulkLongLong(c, server.process_time);
-    numreplies++;
-
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 1) Find victim key:");
-    numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_find_victim_key);
+    addReplyBulkLongLong(c, server.queue_update_time);
     numreplies++;
 
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 2) Make dram key val:");
+    addReplyBulkCString(c, "Queue update time (remove list):");
     numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_make_dram_key_val);
-    numreplies++;
-
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 3) Dict unlink:");
-    numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_dict_unlink);
+    addReplyBulkLongLong(c, server.queue_update_remove_list_time);
     numreplies++;
 
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 4) Pmem eviction:");
+    addReplyBulkCString(c, "Queue update time (add list):");
     numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_pmem_eviction);
-    numreplies++;
-
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 5) Pmem entry free:");
-    numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_pmem_entry_free);
+    addReplyBulkLongLong(c, server.queue_update_add_list_time);
     numreplies++;
 
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 6) Add dram entry:");
+    addReplyBulkCString(c, "Access time:");
     numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_add_dram_entry);
+    addReplyBulkLongLong(c, server.access_time);
     numreplies++;
 
-    addReplyBulkCString(c, "freePmemMemoryIfNeeded, 7) Feed dram log:");
-    numreplies++;
-    addReplyBulkLongLong(c, server.free_pmem_time_feed_dram_log);
-    numreplies++;
+    // addReplyBulkCString(c, "total process used time:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.process_time);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 1) Find victim key:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_find_victim_key);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 2) Make dram key val:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_make_dram_key_val);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 3) Dict unlink:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_dict_unlink);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 4) Pmem eviction:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_pmem_eviction);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 5) Pmem entry free:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_pmem_entry_free);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 6) Add dram entry:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_add_dram_entry);
+    // numreplies++;
+
+    // addReplyBulkCString(c, "freePmemMemoryIfNeeded, 7) Feed dram log:");
+    // numreplies++;
+    // addReplyBulkLongLong(c, server.free_pmem_time_feed_dram_log);
+    // numreplies++;
 
     setDeferredMultiBulkLength(c, replylen, numreplies);
 }
